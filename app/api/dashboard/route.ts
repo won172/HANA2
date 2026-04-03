@@ -61,7 +61,7 @@ export async function GET() {
       totalTransactions,
       pendingCount,
       statusCounts,
-      activeBudgetCount: budgets.filter((b) => b.status === "ACTIVE").length,
+      activeBudgetCount: budgets.filter((b: { status: string }) => b.status === "ACTIVE").length,
     },
   });
 }
