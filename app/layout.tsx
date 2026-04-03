@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Dongguk University Student Assistant",
-  description: "학생회·동아리 예산 집행 관리 시스템",
+  title: "Hana Campus Budget",
+  description: "하나은행 톤의 학생회·동아리 예산 운영 플랫폼",
 };
 
 export default function RootLayout({

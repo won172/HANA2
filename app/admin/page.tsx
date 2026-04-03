@@ -202,7 +202,7 @@ export default function AdminPage() {
             <p className="text-sm text-gray-500">예산 발행 현황 및 거래 모니터링</p>
           </div>
           <Link href="/admin/issue">
-            <Button className="bg-gray-900 hover:bg-gray-800 text-white cursor-pointer">
+            <Button className="cursor-pointer">
               + 예산 발행
             </Button>
           </Link>
@@ -250,10 +250,10 @@ export default function AdminPage() {
               <div className="text-[11px] text-gray-400">검토 필요</div>
             </CardContent>
           </Card>
-          <Card className="border-[#E5E7EB] bg-[#FFF3E8]/60">
+          <Card className="border-[#E5E7EB] bg-[#E8F7F4]/60">
             <CardContent className="p-4">
               <div className="text-xs text-gray-500 mb-1">감사 앵커</div>
-              <div className="text-xl font-bold text-[#E26F12]">
+              <div className="text-xl font-bold text-[#006B5D]">
                 {stats.anchorSummary.anchored}
               </div>
               <div className="text-[11px] text-gray-400">
@@ -285,7 +285,7 @@ export default function AdminPage() {
 
             <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8F9FB] p-4">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#E26F12]">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#006B5D]">
                   Highlights
                 </div>
                 <div className="space-y-2">
@@ -308,14 +308,14 @@ export default function AdminPage() {
 
               <div className="space-y-4">
                 <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-                  <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#E26F12]">
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#006B5D]">
                     Recommended Actions
                   </div>
                   <div className="space-y-2">
                     {insights.recommendedActions.map((action, index) => (
                       <div
                         key={`${action}-${index}`}
-                        className="rounded-xl border border-[#E5E7EB] bg-[#FFF3E8]/55 px-3 py-2 text-sm text-gray-700"
+                        className="rounded-xl border border-[#E5E7EB] bg-[#E8F7F4]/55 px-3 py-2 text-sm text-gray-700"
                       >
                         {action}
                       </div>
@@ -514,7 +514,7 @@ export default function AdminPage() {
                             가맹점 {anomaly.merchantName}
                           </span>
                         )}
-                        <span className="rounded-full bg-[#FFF3E8] px-2.5 py-1 text-[#E26F12]">
+                        <span className="rounded-full bg-[#E8F7F4] px-2.5 py-1 text-[#006B5D]">
                           영향 금액 {fmt(anomaly.relatedAmount)}원
                         </span>
                       </div>
@@ -555,7 +555,7 @@ export default function AdminPage() {
                           원문 메모
                         </span>
                         <span className="text-gray-300">→</span>
-                        <span className="rounded-full bg-[#FFF3E8] px-2.5 py-1 text-[#E26F12]">
+                        <span className="rounded-full bg-[#E8F7F4] px-2.5 py-1 text-[#006B5D]">
                           {example.normalizedCategory}
                         </span>
                         <span className="text-gray-500">
@@ -602,10 +602,10 @@ export default function AdminPage() {
                 <div className="flex gap-2 mb-4 flex-wrap">
                   <button
                     onClick={() => setSelectedOrg("ALL")}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                      selectedOrg === "ALL"
-                        ? "bg-gray-900 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                        selectedOrg === "ALL"
+                        ? "bg-[#00857A] text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-[#E8F7F4] hover:text-[#006B5D]"
                     }`}
                   >
                     전체
@@ -616,8 +616,8 @@ export default function AdminPage() {
                       onClick={() => setSelectedOrg(orgName)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                         selectedOrg === orgName
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          ? "bg-[#00857A] text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-[#E8F7F4] hover:text-[#006B5D]"
                       }`}
                     >
                       {orgName}
@@ -721,7 +721,7 @@ export default function AdminPage() {
             <div className="mb-4 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
                 <div className="text-xs text-gray-500">완료</div>
-                <div className="mt-1 text-lg font-semibold text-[#E26F12]">
+                <div className="mt-1 text-lg font-semibold text-[#006B5D]">
                   {stats.anchorSummary.anchored}건
                 </div>
               </div>

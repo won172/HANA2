@@ -106,10 +106,10 @@ export default function AdminAnchorsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-[#E5E7EB] bg-[#FFF3E8]/60">
+          <Card className="border-[#E5E7EB] bg-[#E8F7F4]/60">
             <CardContent className="p-5">
               <div className="text-xs text-gray-500">앵커 완료</div>
-              <div className="mt-1 text-2xl font-semibold text-[#E26F12]">
+              <div className="mt-1 text-2xl font-semibold text-[#006B5D]">
                 {data?.stats.anchored ?? 0}
               </div>
             </CardContent>

@@ -2,11 +2,13 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowRight, FilePlus2, FolderClock } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import SidebarLayout from "@/components/SidebarLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { parseJsonResponse } from "@/lib/fetchJson";
 
 type Budget = {
   id: string;
@@ -20,6 +22,11 @@ type Budget = {
   organization: { name: string };
   issuerOrganization: { name: string };
   _count: { transactions: number };
+};
+
+type BudgetRequest = {
+  id: string;
+  status: string;
 };
 
 function fmt(n: number) {
@@ -41,16 +48,22 @@ function ClubDashboardContent() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgName, setOrgName] = useState("");
+  const [requests, setRequests] = useState<BudgetRequest[]>([]);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadBudgets() {
+    async function loadDashboard() {
       setLoading(true);
 
       try {
-        const response = await fetch("/api/budgets");
-        const allBudgets: Budget[] = await response.json();
+        const [budgetsResponse, requestsResponse] = await Promise.all([
+          fetch("/api/budgets"),
+          fetch(`/api/budget-requests?organizationId=${orgId}`),
+        ]);
+        const allBudgets = await parseJsonResponse<Budget[]>(budgetsResponse);
+        const requestData = await parseJsonResponse<BudgetRequest[]>(requestsResponse);
         const filtered = allBudgets.filter((budget) => budget.organizationId === orgId);
 
         if (!isMounted) {
@@ -58,7 +71,19 @@ function ClubDashboardContent() {
         }
 
         setBudgets(filtered);
+        setRequests(requestData);
         setOrgName(filtered[0]?.organization.name ?? "동아리");
+        setLoadError("");
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setBudgets([]);
+        setRequests([]);
+        setLoadError(
+          error instanceof Error ? error.message : "대시보드 데이터를 불러오지 못했습니다."
+        );
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -66,7 +91,7 @@ function ClubDashboardContent() {
       }
     }
 
-    void loadBudgets();
+    void loadDashboard();
 
     return () => {
       isMounted = false;
@@ -82,6 +107,8 @@ function ClubDashboardContent() {
     const daysUntil = getDaysUntil(budget.validUntil);
     return daysUntil >= 0 && daysUntil <= 14;
   }).length;
+  const pendingRequests = requests.filter((request) => request.status === "PENDING").length;
+  const approvedRequests = requests.filter((request) => request.status === "APPROVED").length;
 
   return (
     <SidebarLayout
@@ -101,6 +128,20 @@ function ClubDashboardContent() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Link href={`/club/requests/new?org=${orgId}`}>
+              <Button className="cursor-pointer">
+                <FilePlus2 className="mr-1 h-4 w-4" />
+                예산 신청
+              </Button>
+            </Link>
+            <Link href={`/club/requests?org=${orgId}`}>
+              <Button
+                variant="outline"
+                className="cursor-pointer border-gray-300 bg-white"
+              >
+                신청 내역
+              </Button>
+            </Link>
             <Link href="/pos">
               <Button
                 variant="outline"
@@ -118,6 +159,14 @@ function ClubDashboardContent() {
           </div>
         ) : (
           <>
+            {loadError && (
+              <Card className="mb-6 border-red-200 bg-red-50">
+                <CardContent className="p-4 text-sm text-red-700">
+                  {loadError}
+                </CardContent>
+              </Card>
+            )}
+
             <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Card className="border-gray-200">
                 <CardContent className="p-4">
@@ -151,6 +200,62 @@ function ClubDashboardContent() {
                   </div>
                   <div className="text-[11px] text-gray-400">
                     14일 이내 종료 예정
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <Card className="border-[#D5E2DE] bg-white">
+                <CardContent className="p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006B5D]">
+                        Main Flow
+                      </div>
+                      <h2 className="mt-2 text-lg font-semibold text-gray-900">
+                        예산 신청부터 시작하는 운영 흐름
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-600">
+                        새 행사가 예정되어 있다면 먼저 신청서를 등록하고, 승인 후 발행된 예산에서
+                        집행 요청을 진행하세요.
+                      </p>
+                    </div>
+                    <Link
+                      href={`/club/requests/new?org=${orgId}`}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-[#006B5D] hover:text-[#00857A]"
+                    >
+                      신청서 바로 작성
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[#D5E2DE] bg-[#F7FBFA]">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E8F7F4] text-[#006B5D]">
+                      <FolderClock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">신청 현황</div>
+                      <div className="text-xs text-gray-500">현재 조직 기준</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-[#D5E2DE] bg-white p-4">
+                      <div className="text-xs text-gray-500">검토 대기</div>
+                      <div className="mt-1 text-xl font-bold text-amber-600">
+                        {pendingRequests}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-[#D5E2DE] bg-white p-4">
+                      <div className="text-xs text-gray-500">발행 완료</div>
+                      <div className="mt-1 text-xl font-bold text-[#006B5D]">
+                        {approvedRequests}
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

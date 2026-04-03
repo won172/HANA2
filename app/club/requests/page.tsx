@@ -1,12 +1,15 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { FilePlus2, Inbox, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import SidebarLayout from "@/components/SidebarLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { parseJsonResponse } from "@/lib/fetchJson";
+import { getRequestStatusLabel, parseRequestedCategories } from "@/lib/budgetRequests";
 
 type BudgetRequest = {
   id: string;
@@ -27,24 +30,58 @@ function fmt(amount: number) {
 }
 
 function parseCategories(value: string) {
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return parseRequestedCategories(value);
 }
 
 function ClubRequestsPageContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get("org") || "org-stats";
   const [requests, setRequests] = useState<BudgetRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/budget-requests?organizationId=${orgId}`)
-      .then((response) => response.json())
-      .then(setRequests);
+    let active = true;
+
+    async function loadRequests() {
+      setLoading(true);
+
+      try {
+        const response = await fetch(`/api/budget-requests?organizationId=${orgId}`);
+        const data = await parseJsonResponse<BudgetRequest[]>(response);
+
+        if (!active) {
+          return;
+        }
+
+        setRequests(data);
+        setLoadError("");
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setRequests([]);
+        setLoadError(
+          error instanceof Error ? error.message : "예산 신청 내역을 불러오지 못했습니다."
+        );
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadRequests();
+
+    return () => {
+      active = false;
+    };
   }, [orgId]);
+
+  const pendingCount = requests.filter((request) => request.status === "PENDING").length;
+  const approvedCount = requests.filter((request) => request.status === "APPROVED").length;
+  const rejectedCount = requests.filter((request) => request.status === "REJECTED").length;
 
   return (
     <SidebarLayout userName="동아리" userRole="동아리/학생회" orgId={orgId}>
@@ -57,14 +94,72 @@ function ClubRequestsPageContent() {
             </p>
           </div>
           <Link href={`/club/requests/new?org=${orgId}`}>
-            <Button className="cursor-pointer bg-gray-900 text-white hover:bg-gray-800">
+            <Button className="cursor-pointer">
               + 새 신청
             </Button>
           </Link>
         </div>
 
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <Card className="border-[#D5E2DE] bg-white">
+            <CardContent className="p-4">
+              <div className="text-xs text-gray-500">검토 대기</div>
+              <div className="mt-1 text-xl font-bold text-amber-600">{pendingCount}건</div>
+            </CardContent>
+          </Card>
+          <Card className="border-[#D5E2DE] bg-white">
+            <CardContent className="p-4">
+              <div className="text-xs text-gray-500">발행 완료</div>
+              <div className="mt-1 text-xl font-bold text-[#006B5D]">{approvedCount}건</div>
+            </CardContent>
+          </Card>
+          <Card className="border-[#D5E2DE] bg-white">
+            <CardContent className="p-4">
+              <div className="text-xs text-gray-500">보완 필요</div>
+              <div className="mt-1 text-xl font-bold text-red-600">{rejectedCount}건</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mb-6 border-[#D5E2DE] bg-[#F7FBFA]">
+          <CardContent className="flex flex-col gap-3 p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">
+                신청이 승인되면 예산이 자동 발행됩니다
+              </h2>
+              <p className="mt-1 text-sm text-gray-600">
+                승인된 신청은 예산 상세로 바로 연결되고, 반려된 신청은 검토 의견을 확인한 뒤
+                새 신청서로 보완할 수 있습니다.
+              </p>
+            </div>
+            <Link href={`/club/requests/new?org=${orgId}`}>
+              <Button className="cursor-pointer">
+                <FilePlus2 className="mr-1 h-4 w-4" />
+                새 신청 작성
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {loadError && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="p-4 text-sm text-red-700">
+              {loadError}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-4">
-          {requests.map((request) => (
+          {loading && (
+            <Card className="border-gray-200">
+              <CardContent className="p-10 text-center text-sm text-gray-500">
+                로딩 중...
+              </CardContent>
+            </Card>
+          )}
+
+          {!loading &&
+            requests.map((request) => (
             <Card key={request.id} className="border-gray-200">
               <CardContent className="p-5">
                 <div className="mb-2 flex items-start justify-between gap-4">
@@ -81,6 +176,9 @@ function ClubRequestsPageContent() {
                     </div>
                     <div className="text-xs text-gray-400">
                       {new Date(request.createdAt).toLocaleDateString("ko-KR")}
+                    </div>
+                    <div className="mt-1 text-[11px] text-gray-500">
+                      {getRequestStatusLabel(request.status)}
                     </div>
                   </div>
                 </div>
@@ -109,12 +207,18 @@ function ClubRequestsPageContent() {
                 )}
 
                 {request.issuedBudget && (
-                  <div className="mt-3">
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-[#D5E2DE] bg-[#F7FBFA] px-4 py-3">
+                    <div className="flex items-center gap-3 text-sm text-gray-700">
+                      <WalletCards className="h-4 w-4 text-[#006B5D]" />
+                      <span>
+                        발행 예산 <strong>{request.issuedBudget.name}</strong>
+                      </span>
+                    </div>
                     <Link
                       href={`/club/budgets/${request.issuedBudget.id}?org=${orgId}`}
-                      className="text-sm font-medium text-teal-700 hover:text-teal-800"
+                      className="text-sm font-medium text-[#006B5D] hover:text-[#00857A]"
                     >
-                      발행된 예산 보기 →
+                      예산 상세 보기 →
                     </Link>
                   </div>
                 )}
@@ -122,9 +226,14 @@ function ClubRequestsPageContent() {
             </Card>
           ))}
 
-          {requests.length === 0 && (
+          {!loading && requests.length === 0 && (
             <Card className="border-gray-200">
               <CardContent className="p-10 text-center text-sm text-gray-500">
+                <div className="mb-3 flex justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E8F7F4] text-[#006B5D]">
+                    <Inbox className="h-5 w-5" />
+                  </div>
+                </div>
                 아직 등록된 예산 신청이 없습니다.
               </CardContent>
             </Card>

@@ -90,7 +90,7 @@ export default function AdminMerchantsPage() {
           </p>
         </div>
 
-        <Card className="mb-6 border-[#E5E7EB] bg-[#FFF3E8]/60 shadow-[0_2px_8px_rgba(17,24,39,0.06)]">
+        <Card className="mb-6 border-[#E5E7EB] bg-[#E8F7F4]/60 shadow-[0_2px_8px_rgba(17,24,39,0.06)]">
           <CardContent className="grid gap-4 p-5 md:grid-cols-3">
             <div>
               <div className="text-xs text-gray-500">전체 가맹점</div>
@@ -100,7 +100,7 @@ export default function AdminMerchantsPage() {
             </div>
             <div>
               <div className="text-xs text-gray-500">승인 완료</div>
-              <div className="mt-1 text-xl font-semibold text-[#E26F12]">
+              <div className="mt-1 text-xl font-semibold text-[#006B5D]">
                 {merchants.filter((merchant) => merchant.isApproved).length}개
               </div>
             </div>
@@ -154,7 +154,7 @@ export default function AdminMerchantsPage() {
                           [merchant.id]: event.target.value,
                         }))
                       }
-                      className="h-11 w-full rounded-xl border border-[#D1D5DB] bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                      className="h-11 w-full rounded-xl border border-[#D1D5DB] bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                     >
                       {CATEGORY_OPTIONS.map((category) => (
                         <option key={category} value={category}>
@@ -187,8 +187,8 @@ export default function AdminMerchantsPage() {
                       disabled={processingId === merchant.id}
                       className={`cursor-pointer ${
                         merchant.isApproved
-                          ? "border-[#F58220]/30 bg-white text-[#F58220] hover:bg-[#FFF3E8]"
-                          : "bg-[#F58220] text-white hover:bg-[#E26F12]"
+                          ? "border-[#00857A]/30 bg-white text-[#00857A] hover:bg-[#E8F7F4]"
+                          : "bg-[#00857A] text-white hover:bg-[#006B5D]"
                       }`}
                     >
                       {merchant.isApproved ? "승인 해제" : "가맹점 승인"}

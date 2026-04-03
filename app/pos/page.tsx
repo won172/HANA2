@@ -211,7 +211,7 @@ export default function POSPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-4 cursor-pointer"
+                  className="w-full cursor-pointer"
                 >
                   {loading ? "처리 중..." : "💳 결제 요청"}
                 </Button>

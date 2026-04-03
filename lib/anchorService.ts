@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
 import type { PrismaClient } from "../generated/prisma/client";
+import { getAnchoringAdapter } from "@/lib/anchorAdapter";
+import { hashPayload } from "@/lib/hashPayload";
 
 export type AnchorEventType =
   | "BUDGET_ISSUED"
@@ -42,15 +43,11 @@ function canonicalize(value: unknown): unknown {
 }
 
 export function buildPayloadHash(payload: AnchorPayload) {
-  const canonicalPayload = JSON.stringify(canonicalize(payload));
-  return createHash("sha256").update(canonicalPayload).digest("hex");
+  return hashPayload(canonicalize(payload) as AnchorPayload);
 }
 
 export function buildMockTxHash(eventType: AnchorEventType, payloadHash: string) {
-  return `0x${createHash("sha256")
-    .update(`${eventType}:${payloadHash}`)
-    .digest("hex")
-    .slice(0, 64)}`;
+  return `mock:${eventType}:${payloadHash.slice(0, 12)}`;
 }
 
 export async function createAnchorRecord(
@@ -58,7 +55,13 @@ export async function createAnchorRecord(
   input: AnchorInput
 ) {
   const payloadHash = buildPayloadHash(input.payload);
-  const txHash = buildMockTxHash(input.eventType, payloadHash);
+  const adapter = getAnchoringAdapter();
+  const anchored = await adapter.anchor({
+    eventType: input.eventType,
+    payloadHash,
+    entityType: input.entityType,
+    entityId: input.entityId,
+  });
 
   return client.anchorRecord.create({
     data: {
@@ -66,9 +69,9 @@ export async function createAnchorRecord(
       entityType: input.entityType,
       entityId: input.entityId,
       payloadHash,
-      chainStatus: "ANCHORED",
-      txHash,
-      anchoredAt: new Date(),
+      chainStatus: anchored.chainStatus,
+      txHash: anchored.txHash,
+      anchoredAt: anchored.anchoredAt,
     },
   });
 }

@@ -273,7 +273,7 @@ export default function IssueBudgetPage() {
                     <select
                       value={orgId}
                       onChange={(event) => setOrgId(event.target.value)}
-                      className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                      className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                     >
                       {orgs.map((organization) => (
                         <option key={organization.id} value={organization.id}>
@@ -360,8 +360,8 @@ export default function IssueBudgetPage() {
                         onClick={() => setTemplateKey(template.key)}
                         className={`rounded-2xl border p-4 text-left transition-colors ${
                           active
-                            ? "border-[#F58220] bg-[#FFF3E8]"
-                            : "border-[#E5E7EB] bg-white hover:border-[#F58220]/50"
+                            ? "border-[#00857A] bg-[#E8F7F4]"
+                            : "border-[#E5E7EB] bg-white hover:border-[#00857A]/50"
                         }`}
                       >
                         <div className="mb-1 font-semibold text-gray-900">
@@ -450,7 +450,7 @@ export default function IssueBudgetPage() {
                               onClick={() => toggleCategory(category.key, "event")}
                               className={`w-full rounded-xl px-2 py-1 text-[11px] ${
                                 isEvent
-                                  ? "bg-[#F58220] text-white"
+                                  ? "bg-[#00857A] text-white"
                                   : "bg-white text-gray-500"
                               }`}
                             >
@@ -576,7 +576,7 @@ export default function IssueBudgetPage() {
             <Button
               onClick={handleSubmit}
               disabled={loading}
-              className="h-11 w-full cursor-pointer rounded-xl bg-[#F58220] text-white hover:bg-[#E26F12]"
+              className="h-11 w-full cursor-pointer rounded-xl bg-[#00857A] text-white hover:bg-[#006B5D]"
             >
               {loading ? "발행 중..." : "예산 발행하기"}
             </Button>

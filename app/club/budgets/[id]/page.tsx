@@ -452,7 +452,7 @@ export default function BudgetDetailPage({
           <Card className="border-gray-200">
             <CardContent className="p-4">
               <div className="text-xs text-gray-500">현재 잔액</div>
-              <div className="text-lg font-bold text-[#E26F12]">
+              <div className="text-lg font-bold text-[#006B5D]">
                 {fmt(budget.currentBalance)}원
               </div>
             </CardContent>
@@ -471,7 +471,7 @@ export default function BudgetDetailPage({
               <div className="text-lg font-bold text-gray-900">{usedPercent}%</div>
               <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100">
                 <div
-                  className="h-1.5 rounded-full bg-[#F58220]"
+                  className="h-1.5 rounded-full bg-[#00857A]"
                   style={{ width: `${usedPercent}%` }}
                 />
               </div>
@@ -514,7 +514,7 @@ export default function BudgetDetailPage({
                   <select
                     value={category}
                     onChange={(event) => setCategory(event.target.value)}
-                    className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                    className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                   >
                     {requestCategories.map((item) => (
                       <option key={item} value={item}>
@@ -554,7 +554,7 @@ export default function BudgetDetailPage({
                 <Button
                   onClick={handleSubmitRequest}
                   disabled={submitting}
-                  className="cursor-pointer bg-[#F58220] text-white hover:bg-[#E26F12]"
+                  className="cursor-pointer bg-[#00857A] text-white hover:bg-[#006B5D]"
                 >
                   {submitting ? "처리 중..." : "결제 요청 보내기"}
                 </Button>
@@ -610,7 +610,7 @@ export default function BudgetDetailPage({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#E26F12]">
+                    <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#006B5D]">
                       {policy?.templateKey || "custom"}
                     </div>
                     <div className="text-xs text-gray-500">자동 승인 한도</div>
@@ -699,7 +699,7 @@ export default function BudgetDetailPage({
                       allowedKeywords.map((item) => (
                         <span
                           key={item}
-                          className="rounded bg-[#FFF3E8] px-2 py-1 text-xs text-[#E26F12]"
+                          className="rounded bg-[#E8F7F4] px-2 py-1 text-xs text-[#006B5D]"
                         >
                           {item}
                         </span>
@@ -916,7 +916,7 @@ export default function BudgetDetailPage({
                                       transaction
                                     )
                                   }
-                                  className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                                  className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                                 >
                                   {requestCategories.map((item) => (
                                     <option key={`${transaction.id}-${item}`} value={item}>
@@ -992,7 +992,7 @@ export default function BudgetDetailPage({
                                   handleTransactionAction(transaction, "resubmit")
                                 }
                                 disabled={transactionProcessingId === transaction.id}
-                                className="cursor-pointer bg-[#F58220] text-white hover:bg-[#E26F12]"
+                                className="cursor-pointer bg-[#00857A] text-white hover:bg-[#006B5D]"
                               >
                                 수정 후 재요청
                               </Button>
@@ -1080,7 +1080,7 @@ export default function BudgetDetailPage({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="rounded-lg bg-gray-50 p-4">
-                        <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#E26F12]">
+                        <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#006B5D]">
                           {policy.templateKey || "custom"}
                         </div>
                         <div className="text-xs text-gray-500">자동승인 한도</div>
@@ -1159,7 +1159,7 @@ export default function BudgetDetailPage({
                           allowedKeywords.map((item) => (
                             <span
                               key={item}
-                              className="rounded bg-[#FFF3E8] px-2 py-1 text-xs text-[#E26F12]"
+                              className="rounded bg-[#E8F7F4] px-2 py-1 text-xs text-[#006B5D]"
                             >
                               {item}
                             </span>
