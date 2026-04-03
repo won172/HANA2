@@ -1,13 +1,110 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "sqlite"
+}
+
+model User {
+  id   String @id @default(cuid())
+  name String
+  role String // ADMIN, CLUB_USER, APPROVER, POS
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Organization {
+  id   String @id @default(cuid())
+  name String
+  type String // ISSUER, CLUB
+
+  users   User[]
+  budgets Budget[] @relation("OrgBudgets")
+  issuedBudgets Budget[] @relation("IssuedBudgets")
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+}
+
+model Budget {
+  id                  String   @id @default(cuid())
+  name                String
+  totalAmount         Int
+  currentBalance      Int
+  validFrom           DateTime
+  validUntil          DateTime
+  status              String   @default("ACTIVE") // ACTIVE, EXPIRED, RECALLED
+
+  organizationId      String
+  organization        Organization @relation("OrgBudgets", fields: [organizationId], references: [id])
+
+  issuerOrganizationId String
+  issuerOrganization   Organization @relation("IssuedBudgets", fields: [issuerOrganizationId], references: [id])
+
+  policy        Policy?
+  transactions  Transaction[]
+  ledgerEntries LedgerEntry[]
+
+  createdAt DateTime @default(now())
+}
+
+model Policy {
+  id                String  @id @default(cuid())
+  budgetId          String  @unique
+  budget            Budget  @relation(fields: [budgetId], references: [id])
+
+  allowedCategories String  @default("[]") // JSON string array
+  blockedCategories String  @default("[]") // JSON string array
+  blockedKeywords   String  @default("[]") // JSON string array
+  autoApproveLimit  Int     @default(50000)
+  manualReviewLimit Int     @default(150000)
+  allowNewMerchant  Boolean @default(false)
+}
+
+model Transaction {
+  id                String   @id @default(cuid())
+  budgetId          String
+  budget            Budget   @relation(fields: [budgetId], references: [id])
+
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  merchantName      String
+  amount            Int
+  itemDescription   String
+  requestedCategory String
+  resolvedCategory  String?
+
+  status            String   // APPROVED, NOTIFIED, PENDING, DECLINED
+  reviewReason      String?
+
+  // AI 분석 결과
+  aiSuggestedCategory String?
+  aiRiskScore         Int?
+  aiRiskLevel         String?  // LOW, MEDIUM, HIGH
+  aiExplanation       String?
+
+  ledgerEntries     LedgerEntry[]
+
+  createdAt         DateTime @default(now())
+}
+
+model LedgerEntry {
+  id             String   @id @default(cuid())
+  budgetId       String
+  budget         Budget   @relation(fields: [budgetId], references: [id])
+
+  transactionId  String?
+  transaction    Transaction? @relation(fields: [transactionId], references: [id])
+
+  type           String   // ISSUE, SPEND, REFUND, EXPIRE_RECALL
+  amount         Int
+  balanceAfter   Int
+  description    String
+
+  createdAt      DateTime @default(now())
 }
