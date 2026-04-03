@@ -17,6 +17,10 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
     label: "거절",
     className: "bg-red-50 text-red-700 border-red-200",
   },
+  REJECTED: {
+    label: "반려",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
   ACTIVE: {
     label: "활성",
     className: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -28,6 +32,22 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   RECALLED: {
     label: "환수",
     className: "bg-red-50 text-red-600 border-red-200",
+  },
+  SUBMITTED: {
+    label: "제출",
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  REVIEWED: {
+    label: "검토완료",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  ANCHORED: {
+    label: "앵커 완료",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  FAILED: {
+    label: "앵커 실패",
+    className: "bg-red-50 text-red-700 border-red-200",
   },
 };
 

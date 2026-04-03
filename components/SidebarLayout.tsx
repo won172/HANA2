@@ -1,27 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
-const NAV_ITEMS = [
-  { href: "/admin", label: "대시보드", icon: "📊" },
-  { href: "/admin/issue", label: "예산 발행", icon: "➕" },
-  { href: "/admin/pending", label: "보류 검토", icon: "⏳" },
-  { href: "/pos", label: "Mock POS", icon: "🖥️" },
-];
+type SidebarLayoutProps = {
+  children: ReactNode;
+  userName: string;
+  userRole: string;
+  orgId?: string;
+};
+
+function buildNavItems(userRole: string, orgId?: string) {
+  const clubOrgId = orgId ? `?org=${orgId}` : "";
+
+  if (userRole.includes("동아리")) {
+    return [
+      { href: `/club${clubOrgId}`, label: "예산 현황", icon: "📊" },
+      { href: `/club/requests${clubOrgId}`, label: "예산 신청", icon: "📝" },
+      {
+        href: `/club/requests/new${clubOrgId}`,
+        label: "신청서 작성",
+        icon: "➕",
+      },
+      { href: "/pos", label: "POS 데모", icon: "🖥️" },
+    ];
+  }
+
+  if (userRole.includes("가맹점") || userRole.includes("POS")) {
+    return [{ href: "/pos", label: "POS 데모", icon: "🖥️" }];
+  }
+
+  return [
+    { href: "/admin", label: "대시보드", icon: "📊" },
+    { href: "/admin/requests", label: "신청 검토", icon: "📝" },
+    { href: "/admin/issue", label: "예산 발행", icon: "➕" },
+    { href: "/admin/merchants", label: "가맹점 관리", icon: "🏪" },
+    { href: "/admin/anchors", label: "감사 앵커", icon: "🔗" },
+    { href: "/admin/pending", label: "보류 검토", icon: "⏳" },
+    { href: "/admin/settlements", label: "정산 관리", icon: "📘" },
+    { href: "/pos", label: "POS 데모", icon: "🖥️" },
+  ];
+}
 
 export default function SidebarLayout({
   children,
   userName,
   userRole,
-}: {
-  children: ReactNode;
-  userName: string;
-  userRole: string;
-}) {
+  orgId,
+}: SidebarLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const navItems = buildNavItems(userRole, orgId);
 
   const handleLogout = () => {
     document.cookie = "userId=; path=/; max-age=0";
@@ -30,27 +60,24 @@ export default function SidebarLayout({
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        {/* Logo */}
-        <div className="p-4 border-b border-gray-100">
+      <aside className="flex w-[280px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white">
+        <div className="border-b border-gray-100 p-4">
           <Link href="/login" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-white text-sm font-bold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F58220] text-sm font-bold text-white shadow-[0_2px_8px_rgba(17,24,39,0.06)]">
               ₩
             </div>
             <div>
-              <div className="text-sm font-bold text-gray-900 leading-tight">
-                예산 집행
+              <div className="leading-tight text-sm font-bold text-gray-900">
+                Dongguk Budget
               </div>
-              <div className="text-[10px] text-gray-400">플랫폼</div>
+              <div className="text-[10px] text-gray-400">Student Assistant</div>
             </div>
           </Link>
         </div>
 
-        {/* User Info */}
-        <div className="px-4 py-3 border-b border-gray-100">
+        <div className="border-b border-gray-100 px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-sm">
               👤
             </div>
             <div>
@@ -60,20 +87,22 @@ export default function SidebarLayout({
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+        <nav className="flex-1 space-y-1 px-3 py-3">
+          {navItems.map((item) => {
             const isActive =
               item.href === "/admin"
                 ? pathname === "/admin"
-                : pathname.startsWith(item.href);
+                : item.href.startsWith("/club?")
+                  ? pathname === "/club"
+                  : pathname.startsWith(item.href.split("?")[0]);
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-teal-50 text-teal-700 font-medium"
+                    ? "bg-[#FFF3E8] font-medium text-[#E26F12]"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
@@ -84,11 +113,10 @@ export default function SidebarLayout({
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="border-t border-gray-100 p-3">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors w-full rounded-lg hover:bg-gray-50 cursor-pointer"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
           >
             <span>🚪</span>
             <span>로그아웃</span>
@@ -96,8 +124,7 @@ export default function SidebarLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 bg-gray-50 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto bg-gray-50">{children}</main>
     </div>
   );
 }

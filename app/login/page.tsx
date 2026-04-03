@@ -7,7 +7,7 @@ const ROLES = [
   {
     section: "관리자",
     icon: "🏛️",
-    description: "예산 발행, 정책 설정, 보류 거래 검토",
+    description: "예산 신청 검토, 예산 발행, 보류 거래 검토, 정산 관리",
     users: [
       { id: "user-admin", name: "김관리자", path: "/admin" },
     ],
@@ -15,7 +15,7 @@ const ROLES = [
   {
     section: "동아리 / 학생회",
     icon: "👥",
-    description: "예산 현황, 거래 내역 확인",
+    description: "예산 신청, 집행 요청, 거래 보완, 정산 보고",
     users: [
       { id: "user-club1", name: "이동아리", path: "/club?org=org-stats" },
       { id: "user-club2", name: "박동아리", path: "/club?org=org-data" },

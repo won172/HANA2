@@ -5,6 +5,7 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 type Transaction = {
   id: string;
@@ -14,6 +15,9 @@ type Transaction = {
   amount: number;
   status: string;
   reviewReason: string | null;
+  additionalExplanation: string | null;
+  adminComment: string | null;
+  resubmissionCount: number;
   createdAt: string;
   budget: {
     id: string;
@@ -35,13 +39,14 @@ export default function PendingPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, string>>({});
 
   const fetchData = () => {
     setLoading(true);
     fetch("/api/transactions")
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((data) => {
-        setTransactions(data.filter((t: Transaction) => t.status === "PENDING"));
+        setTransactions(data.filter((transaction: Transaction) => transaction.status === "PENDING"));
         setLoading(false);
       });
   };
@@ -53,17 +58,23 @@ export default function PendingPage() {
   const handleAction = async (txId: string, action: "approve" | "decline") => {
     setProcessing(txId);
     try {
-      const res = await fetch(`/api/transactions/${txId}`, {
+      const response = await fetch(`/api/transactions/${txId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({
+          action,
+          reason:
+            comments[txId]?.trim() ||
+            (action === "approve" ? "관리자 수동 승인" : "관리자 거절"),
+          adminComment: comments[txId]?.trim() || null,
+        }),
       });
 
-      if (res.ok) {
+      if (response.ok) {
         fetchData();
       } else {
-        const err = await res.json();
-        alert(err.error || "처리 실패");
+        const error = await response.json();
+        alert(error.error || "처리 실패");
       }
     } catch {
       alert("네트워크 오류");
@@ -74,108 +85,133 @@ export default function PendingPage() {
 
   return (
     <SidebarLayout userName="김관리자" userRole="관리자">
-      <div className="p-6 max-w-4xl">
+      <div className="max-w-4xl p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">보류 거래 검토</h1>
           <p className="text-sm text-gray-500">
-            정책에 의해 보류된 거래를 승인하거나 반려합니다
+            보류 거래를 승인/반려하고, 요청자가 남긴 추가 설명을 함께 검토합니다.
           </p>
         </div>
 
         {loading ? (
-          <div className="text-gray-400 animate-pulse text-center py-20">
-            로딩 중...
-          </div>
+          <div className="py-20 text-center text-gray-400 animate-pulse">로딩 중...</div>
         ) : transactions.length === 0 ? (
           <Card className="border-gray-200">
             <CardContent className="p-12 text-center">
-              <div className="text-4xl mb-3">✅</div>
-              <p className="text-gray-500 text-sm">
-                검토 대기 중인 거래가 없습니다
-              </p>
+              <div className="mb-3 text-4xl">✅</div>
+              <p className="text-sm text-gray-500">검토 대기 중인 거래가 없습니다</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {transactions.map((tx) => (
-              <Card key={tx.id} className="border-gray-200 hover:shadow-sm transition-shadow">
+            {transactions.map((transaction) => (
+              <Card
+                key={transaction.id}
+                className="border-gray-200 transition-shadow hover:shadow-sm"
+              >
                 <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <h3 className="font-semibold text-gray-900">
-                          {tx.merchantName}
+                          {transaction.merchantName}
                         </h3>
-                        <StatusBadge status={tx.status} />
+                        <StatusBadge status={transaction.status} />
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        {tx.itemDescription}
+                      <p className="mb-2 text-sm text-gray-600">
+                        {transaction.itemDescription}
                       </p>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                        <span>카테고리: {tx.requestedCategory}</span>
-                        <span>예산: {tx.budget.name}</span>
-                        <span>조직: {tx.budget.organization.name}</span>
+                        <span>카테고리: {transaction.requestedCategory}</span>
+                        <span>예산: {transaction.budget.name}</span>
+                        <span>조직: {transaction.budget.organization.name}</span>
+                        <span>예산 잔액: {fmt(transaction.budget.currentBalance)}원</span>
                         <span>
-                          예산 잔액: {fmt(tx.budget.currentBalance)}원
+                          요청일: {new Date(transaction.createdAt).toLocaleDateString("ko-KR")}
                         </span>
-                        <span>
-                          요청일:{" "}
-                          {new Date(tx.createdAt).toLocaleDateString("ko-KR")}
-                        </span>
+                        <span>재요청: {transaction.resubmissionCount}회</span>
                       </div>
-                      {tx.reviewReason && (
-                        <div className="mt-2 text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-md inline-block">
-                          💡 {tx.reviewReason}
+
+                      {transaction.reviewReason && (
+                        <div className="mt-2 inline-block rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
+                          판정 사유: {transaction.reviewReason}
                         </div>
                       )}
-                      
-                      {tx.aiRiskScore !== null && (
-                        <div className="mt-3 bg-gray-50 rounded-md p-3 border border-gray-100">
-                          <div className="flex items-center gap-2 mb-1">
+
+                      {transaction.additionalExplanation && (
+                        <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+                          추가 설명: {transaction.additionalExplanation}
+                        </div>
+                      )}
+
+                      {transaction.aiRiskScore !== null && (
+                        <div className="mt-3 rounded-md border border-gray-100 bg-gray-50 p-3">
+                          <div className="mb-1 flex items-center gap-2">
                             <span className="text-sm">🤖</span>
-                            <span className="text-xs font-semibold text-gray-700">AI 분석 참고 </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                              tx.aiRiskLevel === "HIGH" ? "bg-red-100 text-red-700" :
-                              tx.aiRiskLevel === "MEDIUM" ? "bg-amber-100 text-amber-700" :
-                              "bg-emerald-100 text-emerald-700"
-                            }`}>
-                              리스크: {tx.aiRiskScore}/100 ({tx.aiRiskLevel})
+                            <span className="text-xs font-semibold text-gray-700">
+                              AI 분석 참고
                             </span>
-                            {tx.aiSuggestedCategory && (
-                              <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full">
-                                추천: {tx.aiSuggestedCategory}
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                                transaction.aiRiskLevel === "HIGH"
+                                  ? "bg-red-100 text-red-700"
+                                  : transaction.aiRiskLevel === "MEDIUM"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              리스크: {transaction.aiRiskScore}/100 ({transaction.aiRiskLevel})
+                            </span>
+                            {transaction.aiSuggestedCategory && (
+                              <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">
+                                추천: {transaction.aiSuggestedCategory}
                               </span>
                             )}
                           </div>
-                          {tx.aiExplanation && (
-                            <p className="text-xs text-gray-600 mt-1.5 leading-snug">
-                              {tx.aiExplanation}
+                          {transaction.aiExplanation && (
+                            <p className="mt-1.5 text-xs leading-snug text-gray-600">
+                              {transaction.aiExplanation}
                             </p>
                           )}
                         </div>
                       )}
+
+                      <div className="mt-4">
+                        <Textarea
+                          value={comments[transaction.id] ?? transaction.adminComment ?? ""}
+                          onChange={(event) =>
+                            setComments((previous) => ({
+                              ...previous,
+                              [transaction.id]: event.target.value,
+                            }))
+                          }
+                          className="min-h-20"
+                          placeholder="승인 또는 반려 사유를 입력하세요."
+                        />
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2 ml-4">
+
+                    <div className="ml-4 flex flex-col items-end gap-2">
                       <span className="text-lg font-bold text-gray-900">
-                        {fmt(tx.amount)}원
+                        {fmt(transaction.amount)}원
                       </span>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => handleAction(tx.id, "approve")}
-                          disabled={processing === tx.id}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs cursor-pointer"
+                          onClick={() => handleAction(transaction.id, "approve")}
+                          disabled={processing === transaction.id}
+                          className="cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
                         >
-                          ✓ 승인
+                          승인
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleAction(tx.id, "decline")}
-                          disabled={processing === tx.id}
-                          className="text-red-600 border-red-200 hover:bg-red-50 text-xs cursor-pointer"
+                          onClick={() => handleAction(transaction.id, "decline")}
+                          disabled={processing === transaction.id}
+                          className="cursor-pointer border-red-200 text-red-600 hover:bg-red-50"
                         >
-                          ✕ 반려
+                          반려
                         </Button>
                       </div>
                     </div>

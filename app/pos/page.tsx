@@ -122,12 +122,16 @@ export default function POSPage() {
   const selectedBudget = budgets.find((b) => b.id === budgetId);
 
   return (
-    <SidebarLayout userName="POS단말기" userRole="Mock POS">
+    <SidebarLayout userName="POS단말기" userRole="가맹점 시뮬레이터">
       <div className="p-6 max-w-2xl">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Mock POS 단말기</h1>
+          <div className="mb-2 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+            데모 모드
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">가맹점 결제 시뮬레이터</h1>
           <p className="text-sm text-gray-500">
-            결제 요청을 시뮬레이션합니다 (텍스트 입력 기반)
+            운영 흐름의 메인 화면은 동아리 예산 상세입니다. 이 페이지는 POS 요청을
+            별도로 시연하기 위한 데모용 화면입니다.
           </p>
         </div>
 
@@ -139,7 +143,7 @@ export default function POSPage() {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gray-100 text-xl mb-2">
                   🖥️
                 </div>
-                <h2 className="font-semibold text-gray-900">결제 요청</h2>
+                <h2 className="font-semibold text-gray-900">결제 요청 시뮬레이션</h2>
               </div>
 
               <div className="space-y-4">
