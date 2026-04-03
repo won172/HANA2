@@ -20,8 +20,20 @@ export async function GET() {
     take: 20,
   });
 
-  const totalBudget = budgets.reduce<number>((sum, b) => sum + (b.totalAmount ?? 0), 0);
-  const totalBalance = budgets.reduce<number>((sum, b) => sum + (b.currentBalance ?? 0), 0);
+  type BudgetRow = {
+    totalAmount: number | null;
+    currentBalance: number | null;
+  };
+
+  const totalBudget = budgets.reduce(
+    (sum: number, b: BudgetRow) => sum + (b.totalAmount ?? 0),
+    0
+  );
+
+  const totalBalance = budgets.reduce(
+    (sum: number, b: BudgetRow) => sum + (b.currentBalance ?? 0),
+    0
+  );
   const totalTransactions = await prisma.transaction.count();
   const pendingCount = await prisma.transaction.count({
     where: { status: "PENDING" },
