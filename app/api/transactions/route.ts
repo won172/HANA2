@@ -42,10 +42,11 @@ export async function POST(request: Request) {
   }
 
   // 기존 거래에서 알려진 가맹점 목록 추출
-  const existingTransactions = await prisma.transaction.findMany({
-    where: { budgetId },
-    select: { merchantName: true },
-  });
+  const existingTransactions: Array<{ merchantName: string }> =
+    await prisma.transaction.findMany({
+      where: { budgetId },
+      select: { merchantName: true },
+    });
   const knownMerchants = [
     ...new Set(existingTransactions.map((t) => t.merchantName)),
   ];
