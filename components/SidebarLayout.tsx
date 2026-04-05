@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ComponentType, ReactNode, useEffect, useState } from "react";
+import { ComponentType, ReactNode, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -39,6 +39,35 @@ type NavSection = {
   title: string;
   items: NavItem[];
 };
+
+const DEMO_USER_NAMES: Record<string, string> = {
+  "user-admin": "김철수",
+  "user-club1": "홍길동",
+  "user-club2": "이순신",
+  "user-approver": "아무개",
+  "user-pos": "POS단말기",
+};
+
+function getSelectedDemoUserName() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const matchedCookie = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith("userId="));
+  const userId = matchedCookie?.split("=")[1];
+
+  if (!userId) {
+    return null;
+  }
+
+  return DEMO_USER_NAMES[userId] || null;
+}
+
+function getSidebarScrollStorageKey(userRole: string) {
+  return `sidebar-scroll:${userRole}`;
+}
 
 function buildNavSections(userRole: string, orgId?: string): NavSection[] {
   const clubOrgId = orgId ? `?org=${orgId}` : "";
@@ -180,6 +209,9 @@ export default function SidebarLayout({
   const router = useRouter();
   const navSections = buildNavSections(userRole, orgId);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const navRef = useRef<HTMLElement | null>(null);
+  const displayName =
+    typeof document === "undefined" ? userName : getSelectedDemoUserName() || userName;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px)");
@@ -192,6 +224,31 @@ export default function SidebarLayout({
 
     return () => mediaQuery.removeEventListener("change", syncSidebarState);
   }, []);
+
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) {
+      return;
+    }
+
+    const storageKey = getSidebarScrollStorageKey(userRole);
+    const savedScrollTop = window.sessionStorage.getItem(storageKey);
+
+    if (savedScrollTop) {
+      navElement.scrollTop = Number(savedScrollTop);
+    }
+
+    const handleScroll = () => {
+      window.sessionStorage.setItem(storageKey, String(navElement.scrollTop));
+    };
+
+    navElement.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      handleScroll();
+      navElement.removeEventListener("scroll", handleScroll);
+    };
+  }, [userRole, pathname]);
 
   const handleLogout = () => {
     document.cookie = "userId=; path=/; max-age=0";
@@ -260,7 +317,9 @@ export default function SidebarLayout({
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{userName}</div>
+                <div suppressHydrationWarning className="truncate text-sm font-medium">
+                  {displayName}
+                </div>
                 <div className="mt-0.5 text-[11px] text-white/65">
                   {userRole}
                 </div>
@@ -269,7 +328,7 @@ export default function SidebarLayout({
           </div>
         </div>
 
-        <nav className="sidebar-scrollbar flex-1 overflow-y-auto px-4 py-5">
+        <nav ref={navRef} className="sidebar-scrollbar flex-1 overflow-y-auto px-4 py-5">
           <div className="space-y-6">
             {navSections.map((section) => (
               <section key={section.title}>

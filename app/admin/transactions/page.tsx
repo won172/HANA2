@@ -147,22 +147,22 @@ export default async function AdminTransactionsPage({
     ...(riskFilter === "HIGH" ? { aiRiskLevel: "HIGH" } : {}),
     ...(searchQuery
       ? {
-          OR: [
-            { merchantName: { contains: searchQuery, mode: "insensitive" as const } },
-            { itemDescription: { contains: searchQuery, mode: "insensitive" as const } },
-            { requestedCategory: { contains: searchQuery, mode: "insensitive" as const } },
-            {
-              budget: {
-                name: { contains: searchQuery, mode: "insensitive" as const },
-              },
+        OR: [
+          { merchantName: { contains: searchQuery, mode: "insensitive" as const } },
+          { itemDescription: { contains: searchQuery, mode: "insensitive" as const } },
+          { requestedCategory: { contains: searchQuery, mode: "insensitive" as const } },
+          {
+            budget: {
+              name: { contains: searchQuery, mode: "insensitive" as const },
             },
-            {
-              organization: {
-                name: { contains: searchQuery, mode: "insensitive" as const },
-              },
+          },
+          {
+            organization: {
+              name: { contains: searchQuery, mode: "insensitive" as const },
             },
-          ],
-        }
+          },
+        ],
+      }
       : {}),
   };
   const where = {
@@ -310,11 +310,10 @@ export default async function AdminTransactionsPage({
                       page: 1,
                       status: filter,
                     })}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                      isActive
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${isActive
                         ? "bg-[#00857A] text-white"
                         : "bg-white text-gray-600 hover:bg-[#E8F7F4] hover:text-[#006B5D]"
-                    }`}
+                      }`}
                   >
                     {label}
                   </Link>
@@ -375,11 +374,10 @@ export default async function AdminTransactionsPage({
                     page: 1,
                     risk: "ALL",
                   })}
-                  className={`rounded-full px-4 py-2 text-sm font-medium ${
-                    riskFilter === "ALL"
+                  className={`rounded-full px-4 py-2 text-sm font-medium ${riskFilter === "ALL"
                       ? "bg-[#00857A] text-white"
                       : "bg-white text-gray-600 hover:bg-[#E8F7F4]"
-                  }`}
+                    }`}
                 >
                   전체 리스크
                 </Link>
@@ -389,11 +387,10 @@ export default async function AdminTransactionsPage({
                     page: 1,
                     risk: "HIGH",
                   })}
-                  className={`rounded-full px-4 py-2 text-sm font-medium ${
-                    riskFilter === "HIGH"
+                  className={`rounded-full px-4 py-2 text-sm font-medium ${riskFilter === "HIGH"
                       ? "bg-[#00857A] text-white"
                       : "bg-white text-gray-600 hover:bg-[#E8F7F4]"
-                  }`}
+                    }`}
                 >
                   고위험만
                 </Link>
@@ -427,18 +424,18 @@ export default async function AdminTransactionsPage({
               </div>
             </div>
 
-            <div className="w-full overflow-x-auto overflow-y-visible">
-              <table className="w-full min-w-[1240px] table-fixed text-sm">
+            <div className="w-full overflow-x-hidden overflow-y-visible">
+              <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[12%]" />
+                  <col className="w-[10%]" />
                   <col className="w-[11%]" />
-                  <col className="w-[12%]" />
+                  <col className="w-[10%]" />
                   <col className="w-[11%]" />
-                  <col className="w-[18%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
                   <col className="w-[8%]" />
                   <col className="w-[10%]" />
+                  <col className="w-[20%]" />
                 </colgroup>
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
@@ -512,11 +509,10 @@ export default async function AdminTransactionsPage({
                       page: Math.max(1, currentPage - 1),
                     })}
                     aria-disabled={currentPage === 1}
-                    className={`rounded-lg border px-3 py-2 text-sm ${
-                      currentPage === 1
+                    className={`rounded-lg border px-3 py-2 text-sm ${currentPage === 1
                         ? "pointer-events-none border-gray-200 text-gray-300"
                         : "border-[#D5E2DE] text-gray-700 hover:bg-[#F7FBFA]"
-                    }`}
+                      }`}
                   >
                     이전
                   </Link>
@@ -528,11 +524,10 @@ export default async function AdminTransactionsPage({
                         ...currentQuery,
                         page,
                       })}
-                      className={`rounded-lg px-3 py-2 text-sm ${
-                        page === currentPage
+                      className={`rounded-lg px-3 py-2 text-sm ${page === currentPage
                           ? "bg-[#00857A] text-white"
                           : "border border-[#D5E2DE] text-gray-700 hover:bg-[#F7FBFA]"
-                      }`}
+                        }`}
                     >
                       {page}
                     </Link>
@@ -544,11 +539,10 @@ export default async function AdminTransactionsPage({
                       page: Math.min(totalPages, currentPage + 1),
                     })}
                     aria-disabled={currentPage === totalPages}
-                    className={`rounded-lg border px-3 py-2 text-sm ${
-                      currentPage === totalPages
+                    className={`rounded-lg border px-3 py-2 text-sm ${currentPage === totalPages
                         ? "pointer-events-none border-gray-200 text-gray-300"
                         : "border-[#D5E2DE] text-gray-700 hover:bg-[#F7FBFA]"
-                    }`}
+                      }`}
                   >
                     다음
                   </Link>

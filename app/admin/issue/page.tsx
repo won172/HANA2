@@ -327,7 +327,7 @@ export default function IssueBudgetPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="grid gap-6 lg:grid-cols-[0.98fr_1.02fr]">
           <Card className="border-[#E5E7EB] shadow-[0_2px_8px_rgba(17,24,39,0.06)]">
             <CardContent className="p-5">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">예산 기본 정보</h2>

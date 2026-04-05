@@ -121,7 +121,7 @@ export default function AdminPage() {
 
   if (!data && !loadError) {
     return (
-      <SidebarLayout userName="김관리자" userRole="관리자">
+      <SidebarLayout userName="김철수" userRole="관리자">
         <div className="flex h-64 items-center justify-center">
           <div className="animate-pulse text-gray-400">로딩 중...</div>
         </div>
@@ -131,7 +131,7 @@ export default function AdminPage() {
 
   if (!data) {
     return (
-      <SidebarLayout userName="김관리자" userRole="관리자">
+      <SidebarLayout userName="김철수" userRole="관리자">
         <div className="max-w-6xl p-6">
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-4 text-sm text-red-700">
@@ -180,14 +180,13 @@ export default function AdminPage() {
   ];
 
   return (
-    <SidebarLayout userName="김관리자" userRole="관리자">
+    <SidebarLayout userName="김철수" userRole="관리자">
       <div className="max-w-6xl p-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">관리자 대시보드</h1>
             <p className="mt-1 text-sm text-gray-500">
-              들어가자마자 확인해야 하는 운영 대기열만 남겼습니다. 상세 목록은 각
-              화면에서 페이지별로 확인하세요.
+              상세 목록은 각 화면에서 페이지별로 확인하세요.
             </p>
             <div className="mt-2 text-xs text-gray-400">
               마지막 업데이트 {lastUpdatedAt ? fmtDateTime(lastUpdatedAt) : "기록 없음"}
@@ -247,7 +246,7 @@ export default function AdminPage() {
                 className={`h-full transition-colors hover:border-[#00857A] ${item.tone}`}
               >
                 <CardContent className="p-5">
-                  <div className="text-xs text-gray-500">{item.label}</div>
+                  <div className="text-base font-bold text-gray-800">{item.label}</div>
                   <div className="mt-2 text-2xl font-bold text-gray-900">
                     {item.count}
                   </div>

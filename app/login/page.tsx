@@ -10,22 +10,22 @@ const ROLES = [
     section: "관리자",
     icon: Building2,
     description: "신청 검토, 예산 발행, 정산 및 감사 레이어 모니터링",
-    users: [{ id: "user-admin", name: "김관리자", path: "/admin" }],
+    users: [{ id: "user-admin", name: "김철수", path: "/admin" }],
   },
   {
     section: "동아리 / 학생회",
     icon: Users,
     description: "예산 신청, 예외 결제 신청, 보완 제출, 종료 보고",
     users: [
-      { id: "user-club1", name: "이동아리", path: "/club?org=org-stats" },
-      { id: "user-club2", name: "박동아리", path: "/club?org=org-data" },
+      { id: "user-club1", name: "홍길동", path: "/club?org=org-stats" },
+      { id: "user-club2", name: "이순신", path: "/club?org=org-data" },
     ],
   },
   {
     section: "승인자",
     icon: ShieldCheck,
-    description: "보류 거래 검토와 정책 예외 승인 처리",
-    users: [{ id: "user-approver", name: "최승인자", path: "/admin/pending" }],
+    description: "보류 거래 검토",
+    users: [{ id: "user-approver", name: "아무개", path: "/admin/pending" }],
   },
   {
     section: "가맹점 시뮬레이터",
@@ -82,8 +82,7 @@ export default function LoginPage() {
                 학생회 예산 투명 집행 플랫폼
               </h1>
               <p className="mt-5 max-w-md text-sm leading-6 text-white/68">
-                예산 신청부터 집행, 정산, 감사 기록까지 이어지는 운영 흐름을
-                하나은행 스타일의 단정한 앱 셸로 검증하는 데모 환경입니다.
+                예산 신청부터 집행, 정산, 감사 기록까지 이어지는 운영 흐름을 검증하는 데모 환경입니다.
               </p>
             </div>
           </div>
@@ -94,7 +93,7 @@ export default function LoginPage() {
             </div>
             <div className="grid gap-2 text-sm text-white/78">
               <div>예산 신청 → 승인 → 발행 → 집행 → 정산 → 감사 앵커</div>
-              <div>정책 엔진 + AI 보조 분석 + 운영 인사이트 요약</div>
+              <div>AI 정책 엔진 + AI 결제 분석 + 블록체인</div>
             </div>
           </div>
         </section>
@@ -103,10 +102,10 @@ export default function LoginPage() {
           <div className="mb-8">
             <div className="text-sm font-semibold text-[#00857A]">역할 선택</div>
             <h2 className="mt-2 text-[28px] font-bold tracking-[-0.03em] text-[#14332D]">
-              실제 운영 화면처럼 바로 진입합니다.
+              기능 확인을 위해 역할을 선택해주세요.
             </h2>
             <p className="mt-2 text-sm text-[#60716C]">
-              테스트할 역할을 선택하면 해당 앱 셸과 업무 흐름으로 이동합니다.
+              테스트할 역할을 선택하면 해당 업무 흐름으로 이동합니다.
             </p>
           </div>
 
@@ -151,7 +150,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-6 text-center text-xs text-[#60716C]">
-            Demo only · 실제 금융망 및 계정계와는 연결되지 않습니다.
+            Demo only · 실제 금융망 및 계정과는 연결되지 않습니다.
           </p>
         </section>
       </div>

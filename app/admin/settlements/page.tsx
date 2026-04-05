@@ -130,7 +130,7 @@ export default function AdminSettlementsPage() {
   );
 
   return (
-    <SidebarLayout userName="김관리자" userRole="관리자">
+    <SidebarLayout userName="김철수" userRole="관리자">
       <div className="max-w-6xl p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">정산 관리</h1>
@@ -339,11 +339,11 @@ export default function AdminSettlementsPage() {
                             ? "현재 입력값이 추천 환수 금액과 같습니다."
                             : reclaimDraft > row.summary.reclaimAmountSuggested
                               ? `추천 환수보다 ${fmt(
-                                  reclaimDraft - row.summary.reclaimAmountSuggested
-                                )}원 높게 설정했습니다. 근거 메모를 함께 확인하세요.`
+                                reclaimDraft - row.summary.reclaimAmountSuggested
+                              )}원 높게 설정했습니다. 근거 메모를 함께 확인하세요.`
                               : `추천 환수보다 ${fmt(
-                                  row.summary.reclaimAmountSuggested - reclaimDraft
-                                )}원 낮게 설정했습니다. 예외 사유 확인이 필요합니다.`}
+                                row.summary.reclaimAmountSuggested - reclaimDraft
+                              )}원 낮게 설정했습니다. 예외 사유 확인이 필요합니다.`}
                         </div>
                         <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-700">
                           <div className="mb-1 text-xs text-gray-500">정산 메모</div>
