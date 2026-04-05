@@ -177,10 +177,15 @@ export async function assessTransaction(
     normalizedRequestedCategory,
     descriptionForAnalysis,
     {
+      displayName: budget.policy.displayName,
+      summary: budget.policy.summary,
+      policySource: budget.policy.policySource,
       allowedCategories: policyConfig.allowedCategories,
       blockedCategories: policyConfig.blockedCategories,
       blockedKeywords: policyConfig.blockedKeywords,
+      allowedKeywords: policyConfig.allowedKeywords,
       autoApproveLimit: policyConfig.autoApproveLimit,
+      manualReviewLimit: policyConfig.manualReviewLimit,
     }
   );
 

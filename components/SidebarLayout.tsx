@@ -130,6 +130,11 @@ function buildNavSections(userRole: string, orgId?: string): NavSection[] {
           icon: AlertTriangle,
         },
         {
+          href: "/admin/transactions",
+          label: "거래 내역",
+          icon: FileText,
+        },
+        {
           href: "/admin/settlements",
           label: "정산 관리",
           icon: ReceiptText,

@@ -6,13 +6,15 @@ export type AnchorEventType =
   | "BUDGET_ISSUED"
   | "POLICY_SNAPSHOT"
   | "TRANSACTION_DECISION"
-  | "SETTLEMENT_REPORT";
+  | "SETTLEMENT_REPORT"
+  | "POLICY_EXCEPTION_REQUEST";
 
 export type AnchorEntityType =
   | "BUDGET"
   | "POLICY"
   | "TRANSACTION"
-  | "SETTLEMENT";
+  | "SETTLEMENT"
+  | "EXCEPTION_REQUEST";
 
 type AnchorPayload = Record<string, unknown>;
 

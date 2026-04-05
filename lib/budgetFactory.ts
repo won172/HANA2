@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import { createAnchorRecord } from "@/lib/anchorService";
 
 type BudgetPolicyInput = {
+  displayName?: string | null;
+  summary?: string | null;
+  policySource?: string | null;
+  aiConfidence?: number | null;
   allowedCategories?: string[];
   blockedCategories?: string[];
   blockedKeywords?: string[];
@@ -29,7 +33,44 @@ type CreateBudgetInput = {
   policy?: BudgetPolicyInput;
 };
 
+function resolvePolicyEventWindow(
+  validFrom: string | Date,
+  validUntil: string | Date,
+  policy?: BudgetPolicyInput
+) {
+  if (!policy || (policy.eventCategories?.length ?? 0) === 0) {
+    return {
+      eventWindowStart: null,
+      eventWindowEnd: null,
+    };
+  }
+
+  const resolvedValidFrom =
+    validFrom instanceof Date ? validFrom : new Date(validFrom);
+  const resolvedValidUntil =
+    validUntil instanceof Date ? validUntil : new Date(validUntil);
+
+  return {
+    eventWindowStart: policy.eventWindowStart
+      ? policy.eventWindowStart instanceof Date
+        ? policy.eventWindowStart
+        : new Date(policy.eventWindowStart)
+      : resolvedValidFrom,
+    eventWindowEnd: policy.eventWindowEnd
+      ? policy.eventWindowEnd instanceof Date
+        ? policy.eventWindowEnd
+        : new Date(policy.eventWindowEnd)
+      : resolvedValidUntil,
+  };
+}
+
 export async function createBudgetWithPolicy(input: CreateBudgetInput) {
+  const resolvedEventWindow = resolvePolicyEventWindow(
+    input.validFrom,
+    input.validUntil,
+    input.policy
+  );
+
   const budget = await prisma.budget.create({
     data: {
       name: input.name,
@@ -47,6 +88,13 @@ export async function createBudgetWithPolicy(input: CreateBudgetInput) {
       policy: input.policy
         ? {
             create: {
+              displayName: input.policy.displayName || "정책",
+              summary: input.policy.summary || null,
+              policySource: input.policy.policySource || "MANUAL",
+              aiConfidence:
+                typeof input.policy.aiConfidence === "number"
+                  ? input.policy.aiConfidence
+                  : null,
               allowedCategories: JSON.stringify(input.policy.allowedCategories || []),
               blockedCategories: JSON.stringify(input.policy.blockedCategories || []),
               blockedKeywords: JSON.stringify(input.policy.blockedKeywords || []),
@@ -60,16 +108,8 @@ export async function createBudgetWithPolicy(input: CreateBudgetInput) {
               allowNewMerchant: input.policy.allowNewMerchant || false,
               quietHoursStart: input.policy.quietHoursStart ?? null,
               quietHoursEnd: input.policy.quietHoursEnd ?? null,
-              eventWindowStart: input.policy.eventWindowStart
-                ? input.policy.eventWindowStart instanceof Date
-                  ? input.policy.eventWindowStart
-                  : new Date(input.policy.eventWindowStart)
-                : null,
-              eventWindowEnd: input.policy.eventWindowEnd
-                ? input.policy.eventWindowEnd instanceof Date
-                  ? input.policy.eventWindowEnd
-                  : new Date(input.policy.eventWindowEnd)
-                : null,
+              eventWindowStart: resolvedEventWindow.eventWindowStart,
+              eventWindowEnd: resolvedEventWindow.eventWindowEnd,
               templateKey: input.policy.templateKey || null,
             },
           }
@@ -116,6 +156,10 @@ export async function createBudgetWithPolicy(input: CreateBudgetInput) {
       payload: {
         policyId: budget.policy.id,
         budgetId: budget.id,
+        displayName: budget.policy.displayName,
+        summary: budget.policy.summary,
+        policySource: budget.policy.policySource,
+        aiConfidence: budget.policy.aiConfidence,
         templateKey: budget.policy.templateKey,
         allowedCategories: budget.policy.allowedCategories,
         blockedCategories: budget.policy.blockedCategories,

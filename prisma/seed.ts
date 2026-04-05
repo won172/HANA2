@@ -222,7 +222,12 @@ async function main() {
     data: [
       {
         budgetId: eventBudget.id,
-        templateKey: "event",
+        displayName: "AI 정책",
+        summary:
+          "종강총회 운영 목적에 맞춰 식음료, 장소, 행사 물품 중심으로 집행하도록 AI가 구성한 정책입니다.",
+        policySource: "AI",
+        aiConfidence: 0.86,
+        templateKey: "ai-generated",
         allowedCategories: JSON.stringify(["FOOD", "SUPPLIES", "VENUE", "TRANSPORT"]),
         blockedCategories: JSON.stringify(["ALCOHOL", "TOBACCO", "GAME"]),
         blockedKeywords: JSON.stringify(["술", "담배", "주류", "게임"]),
@@ -284,7 +289,12 @@ async function main() {
       },
       {
         budgetId: seminarBudget.id,
-        templateKey: "event",
+        displayName: "AI 정책",
+        summary:
+          "세미나 대관과 다과 집행 목적을 기준으로 대관, 준비물, 식비에 집중되도록 AI가 정책을 생성했습니다.",
+        policySource: "AI",
+        aiConfidence: 0.91,
+        templateKey: "ai-generated",
         allowedCategories: JSON.stringify(["VENUE", "SUPPLIES", "FOOD"]),
         blockedCategories: JSON.stringify(["ALCOHOL", "TOBACCO", "GAME"]),
         blockedKeywords: JSON.stringify(["주류", "담배", "유흥"]),
@@ -302,6 +312,45 @@ async function main() {
         quietHoursEnd: 7,
         eventWindowStart: new Date("2026-03-31"),
         eventWindowEnd: new Date("2026-04-14"),
+      },
+    ],
+  });
+
+  await prisma.policyExceptionRequest.createMany({
+    data: [
+      {
+        id: "exception-data-1",
+        budgetId: operationsBudget.id,
+        organizationId: dataClub.id,
+        merchantName: "행사주류마트",
+        amount: 120000,
+        requestedCategory: "ALCOHOL",
+        itemDescription: "행사 당일 추가 주류 구매",
+        justification:
+          "행사 현장 인원 증가로 기존 승인 범위를 벗어난 주류 구매가 즉시 필요해 정책 예외 검토를 요청합니다.",
+        status: "PENDING",
+        submissionWindowLabel: "오후 운영창",
+        submissionWindowStart: 15,
+        submissionWindowEnd: 17,
+        createdAt: new Date("2026-04-04T15:20:00"),
+      },
+      {
+        id: "exception-stats-1",
+        budgetId: eventBudget.id,
+        organizationId: statsClub.id,
+        merchantName: "시민회관",
+        amount: 180000,
+        requestedCategory: "VENUE",
+        itemDescription: "행사 당일 대관 연장료",
+        justification:
+          "행사 종료가 지연되어 기존 정책 범위 밖의 추가 대관료가 발생해 예외 승인이 필요했습니다.",
+        status: "APPROVED",
+        adminComment: "행사 연장 상황을 확인해 1회성 예외로 승인합니다.",
+        submissionWindowLabel: "오전 운영창",
+        submissionWindowStart: 9,
+        submissionWindowEnd: 11,
+        reviewedAt: new Date("2026-04-02T10:30:00"),
+        createdAt: new Date("2026-04-02T09:40:00"),
       },
     ],
   });

@@ -5,7 +5,9 @@ import SidebarLayout from "@/components/SidebarLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getCategoryLabel } from "@/lib/categoryLabels";
 import { parseJsonResponse } from "@/lib/fetchJson";
+import { Input } from "@/components/ui/input";
 
 type Merchant = {
   id: string;
@@ -30,6 +32,9 @@ export default function AdminMerchantsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [draftCategories, setDraftCategories] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "APPROVED" | "PENDING">("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   async function fetchMerchants() {
     try {
@@ -80,6 +85,18 @@ export default function AdminMerchantsPage() {
     }
   }
 
+  const filteredMerchants = merchants.filter((merchant) => {
+    const matchesQuery =
+      query.trim().length === 0 ||
+      merchant.name.toLowerCase().includes(query.trim().toLowerCase());
+    const matchesStatus =
+      statusFilter === "ALL" ||
+      (statusFilter === "APPROVED" ? merchant.isApproved : !merchant.isApproved);
+    const matchesCategory =
+      categoryFilter === "ALL" || merchant.category === categoryFilter;
+    return matchesQuery && matchesStatus && matchesCategory;
+  });
+
   return (
     <SidebarLayout userName="김관리자" userRole="관리자">
       <div className="max-w-[1200px] p-6">
@@ -113,6 +130,39 @@ export default function AdminMerchantsPage() {
           </CardContent>
         </Card>
 
+        <Card className="mb-6 border-[#D5E2DE] bg-white">
+          <CardContent className="grid gap-3 p-4 lg:grid-cols-[1fr_auto_auto]">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="가맹점명 검색"
+            />
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as "ALL" | "APPROVED" | "PENDING")
+              }
+              className="h-11 rounded-xl border border-[#D1D5DB] bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
+            >
+              <option value="ALL">전체 상태</option>
+              <option value="APPROVED">승인 완료</option>
+              <option value="PENDING">검토 필요</option>
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="h-11 rounded-xl border border-[#D1D5DB] bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
+            >
+              <option value="ALL">전체 카테고리</option>
+              {CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>
+                  {getCategoryLabel(category)}
+                </option>
+              ))}
+            </select>
+          </CardContent>
+        </Card>
+
         {loadError && (
           <Card className="mb-6 border-red-200 bg-red-50">
             <CardContent className="p-4 text-sm text-red-700">
@@ -122,7 +172,7 @@ export default function AdminMerchantsPage() {
         )}
 
         <div className="space-y-4">
-          {merchants.map((merchant) => (
+          {filteredMerchants.map((merchant) => (
             <Card
               key={merchant.id}
               className="border-[#E5E7EB] shadow-[0_2px_8px_rgba(17,24,39,0.06)]"
@@ -135,10 +185,10 @@ export default function AdminMerchantsPage() {
                       status={merchant.isApproved ? "APPROVED" : "PENDING"}
                     />
                   </div>
-                  <div className="text-sm text-gray-500">
-                    카테고리 {merchant.category} · 등록일{" "}
-                    {new Date(merchant.createdAt).toLocaleDateString("ko-KR")}
-                  </div>
+	                  <div className="text-sm text-gray-500">
+	                    카테고리 {getCategoryLabel(merchant.category)} · 등록일{" "}
+	                    {new Date(merchant.createdAt).toLocaleDateString("ko-KR")}
+	                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -156,11 +206,11 @@ export default function AdminMerchantsPage() {
                       }
                       className="h-11 w-full rounded-xl border border-[#D1D5DB] bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                     >
-                      {CATEGORY_OPTIONS.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
+	                      {CATEGORY_OPTIONS.map((category) => (
+	                        <option key={category} value={category}>
+	                          {getCategoryLabel(category)}
+	                        </option>
+	                      ))}
                     </select>
                   </div>
 
@@ -179,11 +229,20 @@ export default function AdminMerchantsPage() {
                     </Button>
                     <Button
                       variant={merchant.isApproved ? "outline" : "default"}
-                      onClick={() =>
-                        updateMerchant(merchant, {
+                      onClick={() => {
+                        if (
+                          merchant.isApproved &&
+                          !window.confirm(
+                            `${merchant.name} 승인을 해제하면 이후 거래가 자동 우대 대상에서 빠집니다. 계속할까요?`
+                          )
+                        ) {
+                          return;
+                        }
+
+                        void updateMerchant(merchant, {
                           isApproved: !merchant.isApproved,
-                        })
-                      }
+                        });
+                      }}
                       disabled={processingId === merchant.id}
                       className={`cursor-pointer ${
                         merchant.isApproved
@@ -199,10 +258,10 @@ export default function AdminMerchantsPage() {
             </Card>
           ))}
 
-          {merchants.length === 0 && (
+          {filteredMerchants.length === 0 && (
             <Card className="border-gray-200">
               <CardContent className="p-10 text-center text-sm text-gray-500">
-                등록된 가맹점이 없습니다.
+                조건에 맞는 가맹점이 없습니다.
               </CardContent>
             </Card>
           )}

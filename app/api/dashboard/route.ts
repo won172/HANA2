@@ -7,14 +7,26 @@ import {
 
 export async function GET() {
   try {
-    const [budgets, allTransactions, totalTransactions, pendingCount] =
+    const now = new Date();
+    const expiringThreshold = new Date(now);
+    expiringThreshold.setDate(expiringThreshold.getDate() + 7);
+
+    const [
+      budgets,
+      allTransactions,
+      totalTransactions,
+      pendingCount,
+      pendingExceptionRequestCount,
+      pendingRequestCount,
+      settlementPendingCount,
+    ] =
       await Promise.all([
         prisma.budget.findMany({
           include: {
             organization: true,
-            policy: true,
             _count: { select: { transactions: true } },
           },
+          orderBy: { validUntil: "asc" },
         }),
         prisma.transaction.findMany({
           include: {
@@ -34,6 +46,15 @@ export async function GET() {
         prisma.transaction.count({
           where: { status: "PENDING" },
         }),
+        prisma.policyExceptionRequest.count({
+          where: { status: "PENDING" },
+        }),
+        prisma.budgetRequest.count({
+          where: { status: "PENDING" },
+        }),
+        prisma.budgetSettlement.count({
+          where: { status: "SUBMITTED" },
+        }),
       ]);
 
     type BudgetRow = {
@@ -50,19 +71,6 @@ export async function GET() {
       (sum: number, b: BudgetRow) => sum + (b.currentBalance ?? 0),
       0
     );
-
-    const statusCounts = {
-      APPROVED: await prisma.transaction.count({
-        where: { status: "APPROVED" },
-      }),
-      NOTIFIED: await prisma.transaction.count({
-        where: { status: "NOTIFIED" },
-      }),
-      PENDING: pendingCount,
-      DECLINED: await prisma.transaction.count({
-        where: { status: "DECLINED" },
-      }),
-    };
 
     const anomalies = detectTransactionAnomalies(
       budgets.map((budget) => ({
@@ -148,19 +156,40 @@ export async function GET() {
         }),
       ]);
 
+    const expiringBudgets = budgets
+      .filter(
+        (budget) =>
+          budget.status === "ACTIVE" &&
+          budget.validUntil >= now &&
+          budget.validUntil <= expiringThreshold
+      )
+      .slice(0, 5)
+      .map((budget) => ({
+        id: budget.id,
+        name: budget.name,
+        currentBalance: budget.currentBalance,
+        validUntil: budget.validUntil,
+        organization: {
+          name: budget.organization.name,
+        },
+      }));
+
     return NextResponse.json({
-      budgets,
-      recentTransactions: allTransactions.slice(0, 20),
+      expiringBudgets,
       recentAnchors,
-      anomalies: anomalies.slice(0, 6),
       insights,
       stats: {
         totalBudget,
         totalBalance,
         totalTransactions,
-        pendingCount,
-        statusCounts,
+        pendingCount: pendingCount + pendingExceptionRequestCount,
+        pendingTransactionCount: pendingCount,
+        pendingExceptionRequestCount,
         activeBudgetCount: budgets.filter((b: { status: string }) => b.status === "ACTIVE").length,
+        pendingRequestCount,
+        settlementPendingCount,
+        expiringBudgetCount: expiringBudgets.length,
+        highRiskCount: insights.counters.highRiskCount,
         anchorSummary: {
           total: anchorTotal,
           anchored: anchorAnchored,

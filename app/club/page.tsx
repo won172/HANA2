@@ -123,7 +123,7 @@ function ClubDashboardContent() {
               {orgName || "동아리"} 대시보드
             </h1>
             <p className="text-sm text-gray-500">
-              예산 현황을 확인하고 예산 상세에서 바로 결제 요청을 진행합니다
+              예산 현황을 확인하고 예산 상세에서 정상 결제와 필요한 경우의 예외 신청을 진행합니다
             </p>
           </div>
 
@@ -147,7 +147,7 @@ function ClubDashboardContent() {
                 variant="outline"
                 className="cursor-pointer border-gray-300 bg-white"
               >
-                데모 POS 보기
+                POS 결제 화면
               </Button>
             </Link>
           </div>
@@ -218,7 +218,7 @@ function ClubDashboardContent() {
                       </h2>
                       <p className="mt-1 text-sm text-gray-600">
                         새 행사가 예정되어 있다면 먼저 신청서를 등록하고, 승인 후 발행된 예산에서
-                        집행 요청을 진행하세요.
+                        정책과 집행 조건을 확인하세요.
                       </p>
                     </div>
                     <Link
@@ -266,11 +266,11 @@ function ClubDashboardContent() {
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="font-semibold text-gray-900">
-                      예산 상세에서 바로 요청하세요
+                      예산 상세에서 정책 예외만 신청합니다
                     </h2>
                     <p className="text-sm text-gray-600">
-                      허용 카테고리, 금지 키워드, 자동 승인 한도를 확인한 뒤 같은
-                      화면에서 결제 요청을 보낼 수 있습니다.
+                      허용 카테고리와 금지 키워드를 먼저 확인하고, 정책 밖 긴급 결제만
+                      정해진 운영창에 신청서로 접수합니다.
                     </p>
                   </div>
                   <div className="text-xs text-gray-500">
@@ -339,7 +339,7 @@ function ClubDashboardContent() {
                           <span>
                             사용금액 {fmt(budget.totalAmount - budget.currentBalance)}원
                           </span>
-                          <span>상세 보기 및 결제 요청</span>
+                          <span>상세 보기 및 예외 신청</span>
                         </div>
                       </CardContent>
                     </Card>

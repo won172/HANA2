@@ -73,10 +73,15 @@ export async function analyzeTransaction(
   requestedCategory: string,
   itemDescription: string,
   policyContext: {
+    displayName?: string | null;
+    summary?: string | null;
+    policySource?: string | null;
     allowedCategories: string[];
     blockedCategories: string[];
     blockedKeywords: string[];
+    allowedKeywords?: string[];
     autoApproveLimit: number;
+    manualReviewLimit?: number;
   }
 ): Promise<AiAnalysisResult> {
   const ai = getGeminiClient();
@@ -92,10 +97,15 @@ export async function analyzeTransaction(
 - 설명: ${itemDescription}
 
 ## 정책 컨텍스트
+- 정책 이름: ${policyContext.displayName || "정책"}
+- 정책 설명: ${policyContext.summary || "설명 없음"}
+- 정책 생성 방식: ${policyContext.policySource || "MANUAL"}
 - 허용 카테고리: ${policyContext.allowedCategories.join(", ") || "제한 없음"}
 - 금지 카테고리: ${policyContext.blockedCategories.join(", ") || "없음"}
 - 금지 키워드: ${policyContext.blockedKeywords.join(", ") || "없음"}
+- 허용 키워드: ${policyContext.allowedKeywords?.join(", ") || "없음"}
 - 자동승인 한도: ${policyContext.autoApproveLimit.toLocaleString()}원
+- 수동검토 한도: ${policyContext.manualReviewLimit?.toLocaleString() || "없음"}원
 
 ## 분석 지침
 1. **카테고리 추천**: 가맹점과 설명을 기반으로 가장 적절한 카테고리를 하나만 선택하세요. 가능한 카테고리는 다음과 같습니다: ${CATEGORIES.join(", ")}
@@ -177,10 +187,15 @@ export async function suggestCategory(
     "OTHER",
     itemDescription,
     {
+      displayName: null,
+      summary: null,
+      policySource: null,
       allowedCategories: [],
       blockedCategories: [],
       blockedKeywords: [],
+      allowedKeywords: [],
       autoApproveLimit: 50000,
+      manualReviewLimit: 150000,
     }
   );
   return result.category;
@@ -198,10 +213,15 @@ export async function calculateRiskScore(
     category,
     itemDescription,
     {
+      displayName: null,
+      summary: null,
+      policySource: null,
       allowedCategories: [],
       blockedCategories: [],
       blockedKeywords: [],
+      allowedKeywords: [],
       autoApproveLimit: 50000,
+      manualReviewLimit: 150000,
     }
   );
   return result.risk;

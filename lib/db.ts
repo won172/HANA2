@@ -4,7 +4,9 @@ import path from "path";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaSchemaVersion: string | undefined;
 };
+const PRISMA_SCHEMA_VERSION = "2026-04-05-policy-exception-v1";
 
 function createPrismaClient() {
   const dbPath = path.join(process.cwd(), "dev.db");
@@ -14,6 +16,22 @@ function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+function getPrismaClient() {
+  if (
+    !globalForPrisma.prisma ||
+    globalForPrisma.prismaSchemaVersion !== PRISMA_SCHEMA_VERSION
+  ) {
+    void globalForPrisma.prisma?.$disconnect().catch(() => undefined);
+    globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
+  }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+  return globalForPrisma.prisma;
+}
+
+export const prisma = getPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
+}

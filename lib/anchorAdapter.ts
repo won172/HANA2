@@ -4,7 +4,8 @@ type AnchorEventType =
   | "BUDGET_ISSUED"
   | "POLICY_SNAPSHOT"
   | "TRANSACTION_DECISION"
-  | "SETTLEMENT_REPORT";
+  | "SETTLEMENT_REPORT"
+  | "POLICY_EXCEPTION_REQUEST";
 
 export type AnchorAdapterResult = {
   chainStatus: "PENDING" | "ANCHORED" | "FAILED";

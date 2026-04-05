@@ -58,7 +58,7 @@ export default function AdminSettlementsPage() {
   const [rows, setRows] = useState<SettlementRow[]>([]);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("SUBMITTED");
   const [processingBudgetId, setProcessingBudgetId] = useState<string | null>(null);
   const [draftReclaim, setDraftReclaim] = useState<Record<string, number>>({});
 
@@ -135,7 +135,8 @@ export default function AdminSettlementsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">정산 관리</h1>
           <p className="text-sm text-gray-500">
-            종료 보고 검토, 환수 예정 금액 확인, 정산 상태 확정을 한 화면에서 처리합니다.
+            검토 대기를 먼저 보고, 필요할 때 완료된 정산까지 다시 확인하는 구조로
+            정리했습니다.
           </p>
         </div>
 
@@ -178,7 +179,8 @@ export default function AdminSettlementsPage() {
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">
                   `SUBMITTED` 상태의 종료 보고를 검토한 뒤 금액/메모를 확인하고
-                  `REVIEWED`로 확정하세요.
+                  `REVIEWED`로 확정하세요. 총 환수 예정은 현재 입력값이고, 추천 환수는
+                  시스템이 계산한 기준값입니다.
                 </p>
               </div>
             </div>
@@ -332,7 +334,19 @@ export default function AdminSettlementsPage() {
                             }
                           />
                         </div>
+                        <div className="mb-3 rounded-lg bg-[#F8F9FB] px-3 py-3 text-sm text-gray-700">
+                          {reclaimDraft === row.summary.reclaimAmountSuggested
+                            ? "현재 입력값이 추천 환수 금액과 같습니다."
+                            : reclaimDraft > row.summary.reclaimAmountSuggested
+                              ? `추천 환수보다 ${fmt(
+                                  reclaimDraft - row.summary.reclaimAmountSuggested
+                                )}원 높게 설정했습니다. 근거 메모를 함께 확인하세요.`
+                              : `추천 환수보다 ${fmt(
+                                  row.summary.reclaimAmountSuggested - reclaimDraft
+                                )}원 낮게 설정했습니다. 예외 사유 확인이 필요합니다.`}
+                        </div>
                         <div className="rounded-lg bg-gray-50 px-3 py-3 text-sm text-gray-700">
+                          <div className="mb-1 text-xs text-gray-500">정산 메모</div>
                           {row.settlement.reportNote}
                         </div>
                         <div className="mt-3 flex gap-2">
@@ -345,7 +359,7 @@ export default function AdminSettlementsPage() {
                               className="cursor-pointer"
                             >
                               <ShieldCheck className="mr-1 h-4 w-4" />
-                              검토 완료로 확정
+                              정산 확정
                             </Button>
                           ) : (
                             <Button
@@ -357,7 +371,7 @@ export default function AdminSettlementsPage() {
                               className="cursor-pointer"
                             >
                               <RotateCcw className="mr-1 h-4 w-4" />
-                              재검토 상태로 전환
+                              다시 검토 대기로
                             </Button>
                           )}
                         </div>

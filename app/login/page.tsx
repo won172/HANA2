@@ -15,7 +15,7 @@ const ROLES = [
   {
     section: "동아리 / 학생회",
     icon: Users,
-    description: "예산 신청, 집행 요청, 보완 제출, 종료 보고",
+    description: "예산 신청, 예외 결제 신청, 보완 제출, 종료 보고",
     users: [
       { id: "user-club1", name: "이동아리", path: "/club?org=org-stats" },
       { id: "user-club2", name: "박동아리", path: "/club?org=org-data" },
@@ -35,11 +35,15 @@ const ROLES = [
   },
 ];
 
+function persistSelectedUser(userId: string) {
+  document.cookie = `userId=${userId}; path=/; max-age=86400`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
   const handleSelect = (userId: string, path: string) => {
-    document.cookie = `userId=${userId}; path=/; max-age=86400`;
+    persistSelectedUser(userId);
     router.push(path);
   };
 
@@ -55,7 +59,7 @@ export default function LoginPage() {
                   alt="하나은행 로고"
                   width={44}
                   height={44}
-                  className="object-contain"
+                  className="h-auto w-auto object-contain"
                 />
               </div>
               <div>

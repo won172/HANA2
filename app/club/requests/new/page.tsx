@@ -10,15 +10,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatCategoryList, getCategoryLabel } from "@/lib/categoryLabels";
 import { parseJsonResponse } from "@/lib/fetchJson";
-import {
-  getRecommendedTemplateForRequest,
-  REQUEST_CATEGORIES,
-} from "@/lib/budgetRequests";
+import { REQUEST_CATEGORIES } from "@/lib/budgetRequests";
 
 type Organization = {
   id: string;
   name: string;
+};
+
+type AiPolicyDraft = {
+  displayName: string;
+  summary: string;
+  policySource: "AI";
+  aiConfidence: number;
+  templateKey: string;
+  allowedCategories: string[];
+  blockedCategories: string[];
+  blockedKeywords: string[];
+  allowedKeywords: string[];
+  categoryAutoApproveRules: Record<string, number>;
+  eventCategories: string[];
+  autoApproveLimit: number;
+  manualReviewLimit: number;
+  allowNewMerchant: boolean;
+  quietHoursStart: number | null;
+  quietHoursEnd: number | null;
 };
 
 function ClubRequestNewPageContent() {
@@ -44,8 +61,9 @@ function ClubRequestNewPageContent() {
   ]);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  const recommendedTemplate = getRecommendedTemplateForRequest(requestedCategories);
+  const [aiPreview, setAiPreview] = useState<AiPolicyDraft | null>(null);
+  const [aiPreviewLoading, setAiPreviewLoading] = useState(false);
+  const [aiPreviewError, setAiPreviewError] = useState("");
 
   useEffect(() => {
     fetch("/api/organizations")
@@ -67,12 +85,59 @@ function ClubRequestNewPageContent() {
       });
   }, [initialOrgId]);
 
+  function invalidateAiPreview() {
+    setAiPreview(null);
+    setAiPreviewError("");
+  }
+
   function toggleCategory(category: string) {
     setRequestedCategories((previous) =>
       previous.includes(category)
         ? previous.filter((item) => item !== category)
         : [...previous, category]
     );
+    invalidateAiPreview();
+  }
+
+  async function handleGenerateAiPreview() {
+    setAiPreviewError("");
+
+    if (!title.trim() || requestedAmount <= 0 || !requestedPeriodStart || !requestedPeriodEnd) {
+      setAiPreviewError("신청 제목, 금액, 기간을 먼저 입력해 주세요.");
+      return;
+    }
+
+    if (requestedPeriodStart > requestedPeriodEnd) {
+      setAiPreviewError("종료일은 시작일보다 빠를 수 없습니다.");
+      return;
+    }
+
+    setAiPreviewLoading(true);
+
+    try {
+      const response = await fetch("/api/ai-policy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: title.trim(),
+          purpose: purpose.trim(),
+          totalAmount: requestedAmount,
+          validFrom: requestedPeriodStart,
+          validUntil: requestedPeriodEnd,
+          requestedCategories,
+        }),
+      });
+
+      const result = await parseJsonResponse<AiPolicyDraft>(response);
+      setAiPreview(result);
+    } catch (error) {
+      setAiPreview(null);
+      setAiPreviewError(
+        error instanceof Error ? error.message : "AI 정책 미리보기를 불러오지 못했습니다."
+      );
+    } finally {
+      setAiPreviewLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -150,7 +215,8 @@ function ClubRequestNewPageContent() {
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">예산 신청서 작성</h1>
           <p className="text-sm text-gray-500">
-            동아리 예산 요청을 등록하면 관리자가 검토 후 발행 여부를 결정합니다.
+            동아리 예산 요청을 등록하면 관리자가 검토 후 AI 정책이 포함된 예산 발행
+            여부를 결정합니다.
           </p>
         </div>
 
@@ -166,8 +232,9 @@ function ClubRequestNewPageContent() {
                     신청 후 운영 흐름
                   </h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    신청서가 승인되면 예산과 기본 정책이 자동 발행되고, 이후 예산 상세에서
-                    바로 집행 요청을 할 수 있습니다.
+                    신청서가 승인되면 같은 입력값을 기준으로 AI 정책이 생성된 예산이
+                    발행되고, 이후 예산 상세에서 정상 결제를 진행하며 필요한 경우에만
+                    예외 결제 신청을 할 수 있습니다.
                   </p>
                 </div>
               </div>
@@ -179,25 +246,60 @@ function ClubRequestNewPageContent() {
               <div className="flex items-center gap-2 text-[#006B5D]">
                 <Sparkles className="h-4 w-4" />
                 <span className="text-xs font-semibold uppercase tracking-[0.12em]">
-                  Recommended Template
+                  AI Policy Preview
                 </span>
               </div>
-              <div className="mt-2 text-base font-semibold text-gray-900">
-                {recommendedTemplate.label}
-              </div>
+              <div className="mt-2 text-base font-semibold text-gray-900">승인 시 적용될 AI 정책</div>
               <p className="mt-1 text-sm text-gray-600">
-                {recommendedTemplate.description}
+                신청 제목, 목적, 금액, 기간을 기준으로 승인 시 같은 AI 정책이 생성됩니다.
+                제출 전에 예상 정책을 미리 확인할 수 있습니다.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {recommendedTemplate.allowedCategories.slice(0, 4).map((category) => (
-                  <span
-                    key={category}
-                    className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#006B5D]"
-                  >
-                    {category}
-                  </span>
-                ))}
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGenerateAiPreview}
+                  disabled={aiPreviewLoading}
+                  className="cursor-pointer"
+                >
+                  {aiPreviewLoading
+                    ? "AI 정책 생성 중..."
+                    : aiPreview
+                      ? "AI 정책 다시 보기"
+                      : "AI 정책 미리 보기"}
+                </Button>
               </div>
+              {aiPreviewError && (
+                <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {aiPreviewError}
+                </div>
+              )}
+              {aiPreview ? (
+                <div className="mt-4 space-y-3 rounded-2xl border border-[#D5E2DE] bg-white p-4">
+                  <div className="text-sm font-medium text-gray-900">{aiPreview.summary}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {aiPreview.allowedCategories.map((category) => (
+                      <span
+                        key={category}
+                        className="rounded-full bg-[#E8F7F4] px-2.5 py-1 text-[11px] font-medium text-[#006B5D]"
+                      >
+                        {getCategoryLabel(category)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div>자동 승인 한도: {requestedAmount.toLocaleString("ko-KR")}원 중 {aiPreview.autoApproveLimit.toLocaleString("ko-KR")}원</div>
+                    <div>수동 검토 기준: {aiPreview.manualReviewLimit.toLocaleString("ko-KR")}원</div>
+                    <div>
+                      제한 카테고리: {formatCategoryList(aiPreview.blockedCategories, "없음")}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-[#BBD8D2] bg-white/70 px-4 py-3 text-sm text-gray-600">
+                  기본 정보를 입력한 뒤 AI 정책 미리 보기를 눌러 주세요.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -231,7 +333,10 @@ function ClubRequestNewPageContent() {
                 <Label className="text-sm text-gray-700">신청 제목</Label>
                 <Input
                   value={title}
-                  onChange={(event) => setTitle(event.target.value)}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    invalidateAiPreview();
+                  }}
                   placeholder="예: 5월 공개 세미나 운영 예산"
                   className="mt-1"
                 />
@@ -241,7 +346,10 @@ function ClubRequestNewPageContent() {
                 <Label className="text-sm text-gray-700">예산 목적</Label>
                 <Textarea
                   value={purpose}
-                  onChange={(event) => setPurpose(event.target.value)}
+                  onChange={(event) => {
+                    setPurpose(event.target.value);
+                    invalidateAiPreview();
+                  }}
                   placeholder="행사 목적, 사용처, 운영 계획을 구체적으로 적어주세요."
                   className="mt-1 min-h-28"
                 />
@@ -253,7 +361,10 @@ function ClubRequestNewPageContent() {
                   <Input
                     type="number"
                     value={requestedAmount}
-                    onChange={(event) => setRequestedAmount(Number(event.target.value))}
+                    onChange={(event) => {
+                      setRequestedAmount(Number(event.target.value));
+                      invalidateAiPreview();
+                    }}
                     className="mt-1"
                   />
                 </div>
@@ -262,7 +373,10 @@ function ClubRequestNewPageContent() {
                   <Input
                     type="date"
                     value={requestedPeriodStart}
-                    onChange={(event) => setRequestedPeriodStart(event.target.value)}
+                    onChange={(event) => {
+                      setRequestedPeriodStart(event.target.value);
+                      invalidateAiPreview();
+                    }}
                     className="mt-1"
                   />
                 </div>
@@ -271,7 +385,10 @@ function ClubRequestNewPageContent() {
                   <Input
                     type="date"
                     value={requestedPeriodEnd}
-                    onChange={(event) => setRequestedPeriodEnd(event.target.value)}
+                    onChange={(event) => {
+                      setRequestedPeriodEnd(event.target.value);
+                      invalidateAiPreview();
+                    }}
                     className="mt-1"
                   />
                 </div>
@@ -307,9 +424,9 @@ function ClubRequestNewPageContent() {
                             ? "border-teal-300 bg-teal-50 text-teal-700"
                             : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                         }`}
-                      >
-                        {category}
-                      </button>
+	                      >
+	                        {getCategoryLabel(category)}
+	                      </button>
                     );
                   })}
                 </div>

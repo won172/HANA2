@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const records = await prisma.anchorRecord.findMany({
       orderBy: [{ anchoredAt: "desc" }, { createdAt: "desc" }],
-      take: 50,
+      take: 100,
     });
 
     const budgetIds = records
@@ -62,6 +62,7 @@ export async function GET() {
       POLICY_SNAPSHOT: "정책 스냅샷",
       TRANSACTION_DECISION: "거래 판정",
       SETTLEMENT_REPORT: "정산 보고",
+      POLICY_EXCEPTION_REQUEST: "정책 예외 신청",
     };
 
     const resolvedRecords = records.map((record) => {
@@ -121,6 +122,9 @@ export async function GET() {
         ).length,
         SETTLEMENT_REPORT: records.filter(
           (record) => record.eventType === "SETTLEMENT_REPORT"
+        ).length,
+        POLICY_EXCEPTION_REQUEST: records.filter(
+          (record) => record.eventType === "POLICY_EXCEPTION_REQUEST"
         ).length,
       },
     };

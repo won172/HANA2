@@ -1,39 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createBudgetWithPolicy } from "@/lib/budgetFactory";
+import { generateAiPolicy } from "@/lib/aiPolicyService";
 import {
-  getPolicyTemplate,
-  recommendPolicyTemplate,
-} from "@/lib/policyTemplates";
-import {
-  normalizeRequestedCategories,
-  normalizeStringList,
   parseRequestedCategories,
 } from "@/lib/budgetRequests";
-
-const DEFAULT_BLOCKED_CATEGORIES = ["ALCOHOL", "TOBACCO", "GAME"];
-const DEFAULT_BLOCKED_KEYWORDS = ["술", "담배", "주류", "게임"];
-
-function getDefaultEventWindow(
-  templateKey: string,
-  validFrom: Date,
-  validUntil: Date
-) {
-  if (templateKey !== "event") {
-    return {
-      eventWindowStart: null as Date | null,
-      eventWindowEnd: null as Date | null,
-    };
-  }
-
-  const eventWindowStart = new Date(validFrom);
-  eventWindowStart.setDate(eventWindowStart.getDate() - 1);
-
-  return {
-    eventWindowStart,
-    eventWindowEnd: new Date(validUntil),
-  };
-}
 
 export async function PATCH(
   request: Request,
@@ -88,9 +59,6 @@ export async function PATCH(
       const requestedCategories = parseRequestedCategories(
         budgetRequest.requestedCategories
       );
-      const selectedTemplate =
-        getPolicyTemplate(body.templateKey) ||
-        recommendPolicyTemplate(requestedCategories);
 
       const validFrom = body.validFrom || budgetRequest.requestedPeriodStart;
       const validUntil = body.validUntil || budgetRequest.requestedPeriodEnd;
@@ -102,10 +70,7 @@ export async function PATCH(
       const normalizedReviewerComment =
         typeof body.reviewerComment === "string" && body.reviewerComment.trim()
           ? body.reviewerComment.trim()
-          : `${selectedTemplate.label} 기준으로 승인 후 예산을 발행했습니다.`;
-      const approvedCategories = normalizeRequestedCategories(
-        body.allowedCategories || requestedCategories
-      );
+          : "AI 정책 기준으로 승인 후 예산을 발행했습니다.";
       const periodStart = new Date(validFrom);
       const periodEnd = new Date(validUntil);
 
@@ -130,11 +95,23 @@ export async function PATCH(
         );
       }
 
-      const defaultEventWindow = getDefaultEventWindow(
-        selectedTemplate.key,
-        periodStart,
-        periodEnd
-      );
+      const aiPolicy = await generateAiPolicy({
+        name: normalizedTitle,
+        purpose: budgetRequest.purpose,
+        totalAmount: Math.round(numericAmount),
+        validFrom: periodStart.toISOString().split("T")[0],
+        validUntil: periodEnd.toISOString().split("T")[0],
+      });
+
+      const allowedCategories =
+        requestedCategories.length > 0
+          ? Array.from(
+              new Set([
+                ...aiPolicy.allowedCategories,
+                ...requestedCategories,
+              ])
+            )
+          : aiPolicy.allowedCategories;
 
       const budget = await createBudgetWithPolicy({
         name: normalizedTitle,
@@ -145,49 +122,8 @@ export async function PATCH(
         issuerOrganizationId: issuerOrganization.id,
         sourceRequestId: budgetRequest.id,
         policy: {
-          templateKey: selectedTemplate.key,
-          allowedCategories:
-            approvedCategories.length > 0
-              ? approvedCategories
-              : selectedTemplate.allowedCategories,
-          blockedCategories:
-            normalizeRequestedCategories(body.blockedCategories).length > 0
-              ? normalizeRequestedCategories(body.blockedCategories)
-              : selectedTemplate.blockedCategories || DEFAULT_BLOCKED_CATEGORIES,
-          blockedKeywords:
-            normalizeStringList(body.blockedKeywords).length > 0
-              ? normalizeStringList(body.blockedKeywords)
-              : selectedTemplate.blockedKeywords || DEFAULT_BLOCKED_KEYWORDS,
-          allowedKeywords:
-            normalizeStringList(body.allowedKeywords).length > 0
-              ? normalizeStringList(body.allowedKeywords)
-              : selectedTemplate.allowedKeywords,
-          categoryAutoApproveRules:
-            body.categoryAutoApproveRules ||
-            selectedTemplate.categoryAutoApproveRules,
-          eventCategories:
-            normalizeRequestedCategories(body.eventCategories).length > 0
-              ? normalizeRequestedCategories(body.eventCategories)
-              : selectedTemplate.eventCategories,
-          autoApproveLimit:
-            Number(body.autoApproveLimit) || selectedTemplate.autoApproveLimit,
-          manualReviewLimit:
-            Number(body.manualReviewLimit) || selectedTemplate.manualReviewLimit,
-          allowNewMerchant:
-            typeof body.allowNewMerchant === "boolean"
-              ? body.allowNewMerchant
-              : selectedTemplate.allowNewMerchant,
-          quietHoursStart:
-            body.quietHoursStart !== undefined
-              ? body.quietHoursStart
-              : selectedTemplate.quietHoursStart,
-          quietHoursEnd:
-            body.quietHoursEnd !== undefined
-              ? body.quietHoursEnd
-              : selectedTemplate.quietHoursEnd,
-          eventWindowStart:
-            body.eventWindowStart || defaultEventWindow.eventWindowStart,
-          eventWindowEnd: body.eventWindowEnd || defaultEventWindow.eventWindowEnd,
+          ...aiPolicy,
+          allowedCategories,
         },
       });
 
@@ -206,7 +142,7 @@ export async function PATCH(
       return NextResponse.json({
         request: updatedRequest,
         budget,
-        appliedTemplate: selectedTemplate,
+        appliedPolicy: aiPolicy,
       });
     }
 

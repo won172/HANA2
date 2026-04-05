@@ -10,6 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ALL_BUDGET_CATEGORIES,
+  formatCategoryList,
+  getCategoryLabel,
+} from "@/lib/categoryLabels";
+import {
+  formatPolicyExceptionWindow,
+  getCurrentPolicyExceptionWindow,
+  getNextPolicyExceptionWindow,
+} from "@/lib/policyExceptionWindow";
+import { parseJsonResponse } from "@/lib/fetchJson";
 
 type BudgetDetail = {
   id: string;
@@ -23,6 +34,10 @@ type BudgetDetail = {
   organization: { name: string };
   issuerOrganization: { name: string };
   policy: {
+    displayName: string | null;
+    summary: string | null;
+    policySource: string | null;
+    aiConfidence: number | null;
     allowedCategories: string;
     blockedCategories: string;
     blockedKeywords: string;
@@ -52,6 +67,21 @@ type BudgetDetail = {
     lastSubmittedAt: string | null;
     createdAt: string;
   }>;
+  policyExceptionRequests: Array<{
+    id: string;
+    merchantName: string;
+    amount: number;
+    requestedCategory: string;
+    itemDescription: string;
+    justification: string;
+    status: string;
+    adminComment: string | null;
+    submissionWindowLabel: string;
+    submissionWindowStart: number;
+    submissionWindowEnd: number;
+    reviewedAt: string | null;
+    createdAt: string;
+  }>;
   ledgerEntries: Array<{
     id: string;
     type: string;
@@ -62,34 +92,20 @@ type BudgetDetail = {
   }>;
 };
 
-type PolicyResultType = {
-  status: string;
-  reason: string;
-};
-
-type AiAnalysis = {
-  category: { suggestedCategory: string; confidence: number };
-  risk: { riskScore: number; riskLevel: string; explanation: string };
-  available: boolean;
-};
-
-type TransactionRequestResult = {
-  transaction: {
-    id: string;
-    merchantName: string;
-    amount: number;
-    status: string;
-  };
-  policyResult: PolicyResultType;
-  aiAnalysis?: AiAnalysis;
-};
-
 type FollowUpForm = {
   merchantName: string;
   amount: number;
   requestedCategory: string;
   itemDescription: string;
   additionalExplanation: string;
+};
+
+type PolicyExceptionForm = {
+  merchantName: string;
+  amount: number;
+  requestedCategory: string;
+  itemDescription: string;
+  justification: string;
 };
 
 const FALLBACK_CATEGORIES = [
@@ -115,6 +131,15 @@ function fmt(n: number) {
 
 function fmtDate(date: string) {
   return new Date(date).toLocaleDateString("ko-KR");
+}
+
+function fmtDateTime(date: Date) {
+  return date.toLocaleString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function parsePolicyList(value: string | null | undefined) {
@@ -192,16 +217,19 @@ export default function BudgetDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const [now, setNow] = useState(() => new Date());
   const [budget, setBudget] = useState<BudgetDetail | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [requestResult, setRequestResult] = useState<TransactionRequestResult | null>(
-    null
-  );
-  const [merchantName, setMerchantName] = useState("");
-  const [amount, setAmount] = useState(30000);
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [exceptionSubmitting, setExceptionSubmitting] = useState(false);
+  const [exceptionError, setExceptionError] = useState("");
+  const [exceptionMessage, setExceptionMessage] = useState("");
+  const [exceptionForm, setExceptionForm] = useState<PolicyExceptionForm>({
+    merchantName: "",
+    amount: 0,
+    requestedCategory: "",
+    itemDescription: "",
+    justification: "",
+  });
   const [transactionForms, setTransactionForms] = useState<
     Record<string, FollowUpForm>
   >({});
@@ -214,13 +242,50 @@ export default function BudgetDetailPage({
 
   async function refreshBudget() {
     const response = await fetch(`/api/budgets/${id}`);
-    const data: BudgetDetail = await response.json();
+    const data = await parseJsonResponse<BudgetDetail>(response);
     setBudget(data);
+    setLoadError("");
   }
 
   useEffect(() => {
-    void refreshBudget();
+    let cancelled = false;
+
+    async function loadBudget() {
+      try {
+        const response = await fetch(`/api/budgets/${id}`);
+        const data = await parseJsonResponse<BudgetDetail>(response);
+        if (!cancelled) {
+          setBudget(data);
+          setLoadError("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBudget(null);
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "예산 상세 정보를 불러오지 못했습니다."
+          );
+        }
+      }
+    }
+
+    void loadBudget();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const policy = budget?.policy ?? null;
   const allowedCategories = useMemo(
@@ -250,18 +315,47 @@ export default function BudgetDetailPage({
   const categoryRuleEntries = Object.entries(categoryAutoApproveRules);
   const requestCategories =
     allowedCategories.length > 0 ? allowedCategories : FALLBACK_CATEGORIES;
+  const currentExceptionWindow = getCurrentPolicyExceptionWindow(now);
+  const nextExceptionWindow = getNextPolicyExceptionWindow(now);
+  const exceptionWindowState = currentExceptionWindow
+    ? "진행 중"
+    : nextExceptionWindow
+      ? "운영창 시작 전"
+      : "운영창 없음";
 
   useEffect(() => {
-    if (!category && requestCategories.length > 0) {
-      setCategory(requestCategories[0]);
+    if (
+      exceptionForm.requestedCategory &&
+      !ALL_BUDGET_CATEGORIES.includes(
+        exceptionForm.requestedCategory as (typeof ALL_BUDGET_CATEGORIES)[number]
+      )
+    ) {
+      setExceptionForm((previous) => ({
+        ...previous,
+        requestedCategory: "",
+      }));
     }
-  }, [category, requestCategories]);
+  }, [exceptionForm.requestedCategory, requestCategories]);
 
-  if (!budget) {
+  if (!budget && !loadError) {
     return (
       <SidebarLayout userName="동아리" userRole="동아리/학생회">
         <div className="flex h-64 items-center justify-center">
           <div className="text-gray-400 animate-pulse">로딩 중...</div>
+        </div>
+      </SidebarLayout>
+    );
+  }
+
+  if (!budget) {
+    return (
+      <SidebarLayout userName="동아리" userRole="동아리/학생회">
+        <div className="max-w-3xl p-6">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4 text-sm text-red-700">
+              {loadError || "예산 상세 정보를 불러오지 못했습니다."}
+            </CardContent>
+          </Card>
         </div>
       </SidebarLayout>
     );
@@ -297,46 +391,61 @@ export default function BudgetDetailPage({
     }));
   }
 
-  async function handleSubmitRequest() {
+  async function handleSubmitExceptionRequest() {
     if (!budget) {
       return;
     }
 
-    if (!merchantName.trim() || !description.trim() || !category) {
-      setSubmitError("가맹점명, 카테고리, 품목/메모를 모두 입력하세요.");
+    if (
+      !exceptionForm.merchantName.trim() ||
+      exceptionForm.amount <= 0 ||
+      !exceptionForm.itemDescription.trim() ||
+      !exceptionForm.justification.trim() ||
+      !exceptionForm.requestedCategory
+    ) {
+      setExceptionError(
+        "가맹점명, 금액, 카테고리, 품목/메모, 예외 사유를 모두 입력하세요."
+      );
       return;
     }
 
-    setSubmitting(true);
-    setSubmitError("");
-    setRequestResult(null);
+    setExceptionSubmitting(true);
+    setExceptionError("");
+    setExceptionMessage("");
 
     try {
-      const response = await fetch("/api/transactions", {
+      const response = await fetch("/api/policy-exception-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           budgetId: budget.id,
-          merchantName: merchantName.trim(),
-          amount,
-          requestedCategory: category,
-          itemDescription: description.trim(),
+          merchantName: exceptionForm.merchantName.trim(),
+          amount: exceptionForm.amount,
+          requestedCategory: exceptionForm.requestedCategory,
+          itemDescription: exceptionForm.itemDescription.trim(),
+          justification: exceptionForm.justification.trim(),
         }),
       });
 
-      const data = await response.json();
+      await parseJsonResponse<{ id: string }>(response);
 
-      if (!response.ok) {
-        setSubmitError(data.error || "결제 요청을 처리하지 못했습니다.");
-        return;
-      }
-
-      setRequestResult(data);
+      setExceptionMessage("정책 예외 결제 신청서를 제출했습니다.");
+      setExceptionForm({
+        merchantName: "",
+        amount: 0,
+        requestedCategory: "",
+        itemDescription: "",
+        justification: "",
+      });
       await refreshBudget();
-    } catch {
-      setSubmitError("네트워크 오류로 요청을 완료하지 못했습니다.");
+    } catch (error) {
+      setExceptionError(
+        error instanceof Error
+          ? error.message
+          : "네트워크 오류로 신청을 완료하지 못했습니다."
+      );
     } finally {
-      setSubmitting(false);
+      setExceptionSubmitting(false);
     }
   }
 
@@ -429,14 +538,6 @@ export default function BudgetDetailPage({
                 정산 보고
               </Button>
             </Link>
-            <Link href="/pos">
-              <Button
-                variant="outline"
-                className="cursor-pointer border-gray-300 bg-white"
-              >
-                데모 POS 열기
-              </Button>
-            </Link>
           </div>
         </div>
 
@@ -479,302 +580,396 @@ export default function BudgetDetailPage({
           </Card>
         </div>
 
-        <div className="mb-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <Card className="border-gray-200">
-            <CardContent className="p-5">
-              <div className="mb-4">
-                <h2 className="font-semibold text-gray-900">결제 요청하기</h2>
-                <p className="text-sm text-gray-500">
-                  예산을 확인한 뒤 같은 화면에서 바로 집행 요청을 보낼 수 있습니다.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
+        <div className="mb-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <Card className="border-[#D5E2DE] bg-[#F7FBFA]">
+            <CardContent className="p-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
-                  <Label className="text-sm text-gray-700">가맹점명</Label>
-                  <Input
-                    value={merchantName}
-                    onChange={(event) => setMerchantName(event.target.value)}
-                    placeholder="예: 문구사랑"
-                    className="mt-1"
-                  />
+                  <div className="mb-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-[#006B5D]">
+                    정상 집행 흐름
+                  </div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    일반 결제는 POS에서 진행합니다
+                  </h2>
+                  <p className="mt-2 text-sm text-gray-600">
+                    이 예산을 선택한 상태로 POS를 열어 가맹점, 금액, 품목을 입력하세요.
+                    AI 정책과 정책 엔진이 집행 가능 여부를 바로 판정합니다.
+                  </p>
                 </div>
-                <div>
-                  <Label className="text-sm text-gray-700">결제 금액</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={amount}
-                    onChange={(event) => setAmount(Number(event.target.value))}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-700">카테고리</Label>
-                  <select
-                    value={category}
-                    onChange={(event) => setCategory(event.target.value)}
-                    className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
-                  >
-                    {requestCategories.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-700">예산</Label>
-                  <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                    {budget.name} · 잔액 {fmt(budget.currentBalance)}원
+                <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                  <div className="text-xs text-gray-500">현재 사용 가능 잔액</div>
+                  <div className="text-xl font-bold text-[#006B5D]">
+                    {fmt(budget.currentBalance)}원
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4">
-                <Label className="text-sm text-gray-700">품목 / 메모</Label>
-                <Textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="예: 종강총회 현수막 거치대 구매"
-                  className="mt-1 min-h-24"
-                />
+              <div className="mb-5 grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="mb-2 text-xs font-medium text-[#006B5D]">1. 결제 입력</div>
+                  <div className="text-sm text-gray-700">
+                    POS에서 가맹점, 금액, 카테고리, 품목을 입력합니다.
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="mb-2 text-xs font-medium text-[#006B5D]">2. 정책 판정</div>
+                  <div className="text-sm text-gray-700">
+                    AI 정책과 정책 엔진이 즉시 승인, 알림, 검토, 거절을 판정합니다.
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm">
+                  <div className="mb-2 text-xs font-medium text-[#006B5D]">3. 원장 반영</div>
+                  <div className="text-sm text-gray-700">
+                    승인되면 거래와 원장 기록이 연결되어 잔액이 즉시 갱신됩니다.
+                  </div>
+                </div>
               </div>
 
-              {submitError && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                  {submitError}
-                </div>
-              )}
-
-              <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={`/pos?budgetId=${budget.id}&org=${budget.organizationId}`}>
+                  <Button className="cursor-pointer bg-[#00857A] text-white hover:bg-[#006B5D]">
+                    이 예산으로 결제하기
+                  </Button>
+                </Link>
+                <a
+                  href="#policy-exception"
+                  className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  정책 예외 신청 보기
+                </a>
                 <div className="text-xs text-gray-500">
-                  요청 결과는 승인, 보류, 거절 사유와 함께 바로 표시됩니다.
+                  정책 밖의 긴급 결제만 예외 신청으로 접수합니다.
                 </div>
-                <Button
-                  onClick={handleSubmitRequest}
-                  disabled={submitting}
-                  className="cursor-pointer bg-[#00857A] text-white hover:bg-[#006B5D]"
-                >
-                  {submitting ? "처리 중..." : "결제 요청 보내기"}
-                </Button>
               </div>
-
-              {requestResult && (
-                <Card
-                  className={`mt-4 border-2 ${
-                    requestResult.policyResult.status === "APPROVED"
-                      ? "border-emerald-300 bg-emerald-50"
-                      : requestResult.policyResult.status === "NOTIFIED"
-                        ? "border-blue-300 bg-blue-50"
-                        : requestResult.policyResult.status === "PENDING"
-                          ? "border-amber-300 bg-amber-50"
-                          : "border-red-300 bg-red-50"
-                  }`}
-                >
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <StatusBadge status={requestResult.policyResult.status} />
-                      <div className="text-lg font-bold text-gray-900">
-                        {fmt(requestResult.transaction.amount)}원
-                      </div>
-                    </div>
-                    <div className="text-sm font-medium text-gray-800">
-                      {requestResult.transaction.merchantName}
-                    </div>
-                    <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-sm text-gray-700">
-                      {requestResult.policyResult.reason}
-                    </div>
-                    {requestResult.aiAnalysis?.available && (
-                      <div className="mt-3 text-xs text-gray-600">
-                        AI 위험도 {requestResult.aiAnalysis.risk.riskLevel} · 추천
-                        카테고리 {requestResult.aiAnalysis.category.suggestedCategory}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200">
-            <CardContent className="p-5">
-              <div className="mb-4">
-                <h2 className="font-semibold text-gray-900">결제 전 확인할 정책</h2>
-                <p className="text-sm text-gray-500">
-                  사후 반려가 아니라 사전 이해가 되도록 핵심 제한 조건을 먼저
-                  보여줍니다.
-                </p>
+          <div className="space-y-4">
+            <Card className="border-gray-200">
+              <CardContent className="p-5">
+                <div className="mb-4">
+                  <h2 className="font-semibold text-gray-900">운영창 상태</h2>
+                  <p className="text-sm text-gray-500">
+                    정책 예외 결제 신청은 정해진 운영창에서만 접수됩니다.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-[#D5E2DE] bg-[#F7FBFA] p-4">
+                  <div className="text-xs font-medium text-gray-500">현재 시각</div>
+                  <div className="mt-1 text-lg font-semibold text-gray-900">
+                    {fmtDateTime(now)}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        currentExceptionWindow
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {exceptionWindowState}
+                    </span>
+                    <span className="text-sm text-gray-700">
+                      {currentExceptionWindow
+                        ? formatPolicyExceptionWindow(currentExceptionWindow)
+                        : nextExceptionWindow
+                          ? `${formatPolicyExceptionWindow(nextExceptionWindow)} 예정`
+                          : "운영창 정보 없음"}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    {currentExceptionWindow
+                      ? "지금은 예외 신청서를 제출할 수 있습니다."
+                      : nextExceptionWindow
+                        ? `다음 운영창 시작: ${fmtDateTime(nextExceptionWindow.startsAt)}`
+                        : "다음 운영창 정보를 불러오지 못했습니다."}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-gray-200">
+              <CardContent className="p-5">
+                <div className="mb-4">
+                  <h2 className="font-semibold text-gray-900">
+                    {policy?.displayName || "AI 정책"} 핵심
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    결제 전에 꼭 보는 기준만 간단히 요약했습니다.
+                  </p>
+                </div>
+
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    자동 승인 한도 {fmt(policy?.autoApproveLimit ?? 0)}원 · 수동 검토 기준{" "}
+                    {fmt(policy?.manualReviewLimit ?? 0)}원
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    허용 카테고리: {formatCategoryList(allowedCategories, "제한 없음")}
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    금지 카테고리: {formatCategoryList(blockedCategories, "없음")}
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    금지 키워드:{" "}
+                    {blockedKeywords.length > 0
+                      ? blockedKeywords.slice(0, 4).join(", ")
+                      : "없음"}
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    신규 가맹점은{" "}
+                    <span className="font-semibold text-gray-900">
+                      {policy?.allowNewMerchant ? "허용" : "검토 대상"}
+                    </span>
+                    입니다.
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {policy?.summary ||
+                      "예산 목적과 유효기간 안에서 정책 기준에 맞게 집행해 주세요."}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <details
+          id="policy-exception"
+          className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white"
+        >
+          <summary className="cursor-pointer list-none px-5 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="mb-1 text-sm font-semibold text-gray-900">
+                  정책 예외 결제 신청
+                </div>
+                <div className="text-sm text-gray-500">
+                  정상 집행이 어려운 긴급 결제만 별도로 신청합니다.
+                </div>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    currentExceptionWindow
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {exceptionWindowState}
+                </span>
+                <span className="text-xs text-gray-500">
+                  최근 신청 {budget.policyExceptionRequests.length}건
+                </span>
+              </div>
+            </div>
+          </summary>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#006B5D]">
-                      {policy?.templateKey || "custom"}
-                    </div>
-                    <div className="text-xs text-gray-500">자동 승인 한도</div>
-                    <div className="text-lg font-bold text-gray-900">
-                      {fmt(policy?.autoApproveLimit ?? 0)}원
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <div className="text-xs text-gray-500">수동 검토 기준</div>
-                    <div className="text-lg font-bold text-gray-900">
-                      {fmt(policy?.manualReviewLimit ?? 0)}원
-                    </div>
-                  </div>
-                </div>
+          <div className="border-t border-[#E5E7EB] px-5 py-5">
+            <div className="rounded-xl border border-[#D5E2DE] bg-[#F7FBFA] p-4">
+              <div className="text-sm font-medium text-gray-900">
+                {currentExceptionWindow
+                  ? `${formatPolicyExceptionWindow(currentExceptionWindow)} 동안 제출 가능합니다.`
+                  : "운영창 외 시간에는 예외 신청서를 제출할 수 없습니다."}
+              </div>
+              <div className="mt-1 text-xs text-gray-500">
+                {currentExceptionWindow
+                  ? "제출 후에는 관리자 검토를 거쳐 승인 또는 반려됩니다."
+                  : nextExceptionWindow
+                    ? `다음 운영창: ${fmtDateTime(nextExceptionWindow.startsAt)} · ${formatPolicyExceptionWindow(nextExceptionWindow)}`
+                    : "다음 운영창 정보를 불러오지 못했습니다."}
+              </div>
+            </div>
 
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    사용 가능 기간
+            {currentExceptionWindow ? (
+              <>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label className="text-sm text-gray-700">가맹점명</Label>
+                    <Input
+                      value={exceptionForm.merchantName}
+                      onChange={(event) =>
+                        setExceptionForm((previous) => ({
+                          ...previous,
+                          merchantName: event.target.value,
+                        }))
+                      }
+                      placeholder="예: 문구사랑"
+                      className="mt-1"
+                    />
                   </div>
-                  <div className="text-sm text-gray-800">
-                    {fmtDate(budget.validFrom)} ~ {fmtDate(budget.validUntil)}
+                  <div>
+                    <Label className="text-sm text-gray-700">결제 금액</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={exceptionForm.amount || ""}
+                      onChange={(event) =>
+                        setExceptionForm((previous) => ({
+                          ...previous,
+                          amount: Number(event.target.value),
+                        }))
+                      }
+                      placeholder="금액을 입력하세요"
+                      className="mt-1"
+                    />
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    {daysUntilExpiry >= 0
-                      ? isExpiringSoon
-                        ? `만료 임박: ${daysUntilExpiry}일 남음`
-                        : `${daysUntilExpiry}일 남음`
-                      : "유효기간이 지났습니다"}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    허용 카테고리
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {allowedCategories.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    금지 카테고리
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {blockedCategories.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded bg-red-50 px-2 py-1 text-xs text-red-600"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    금지 키워드
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {blockedKeywords.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded bg-red-50 px-2 py-1 text-xs text-red-600"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    허용 키워드
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {allowedKeywords.length > 0 ? (
-                      allowedKeywords.map((item) => (
-                        <span
-                          key={item}
-                          className="rounded bg-[#E8F7F4] px-2 py-1 text-xs text-[#006B5D]"
-                        >
-                          {item}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-gray-400">설정 없음</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[#E5E7EB] p-4">
-                  <div className="mb-2 text-xs font-medium text-gray-500">
-                    카테고리별 자동 승인 한도
-                  </div>
-                  {categoryRuleEntries.length > 0 ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {categoryRuleEntries.map(([ruleCategory, limit]) => (
-                        <div
-                          key={ruleCategory}
-                          className="rounded-lg bg-[#F8F9FB] px-3 py-2 text-sm text-gray-700"
-                        >
-                          <span className="font-medium text-gray-900">
-                            {ruleCategory}
-                          </span>
-                          {" · "}
-                          {fmt(limit)}원 이하
-                        </div>
+                  <div>
+                    <Label className="text-sm text-gray-700">카테고리</Label>
+                    <select
+                      value={exceptionForm.requestedCategory}
+                      onChange={(event) =>
+                        setExceptionForm((previous) => ({
+                          ...previous,
+                          requestedCategory: event.target.value,
+                        }))
+                      }
+                      className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
+                    >
+                      <option value="">카테고리를 선택하세요</option>
+                      {ALL_BUDGET_CATEGORIES.map((item) => (
+                        <option key={item} value={item}>
+                          {getCategoryLabel(item)}
+                        </option>
                       ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-500">기본 자동 승인 한도만 적용됩니다.</div>
-                  )}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-                    <div className="mb-1 text-xs font-medium text-gray-500">
-                      제한 시간대
-                    </div>
-                    {formatHourRange(policy?.quietHoursStart ?? null, policy?.quietHoursEnd ?? null)}
+                    </select>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-                    <div className="mb-1 text-xs font-medium text-gray-500">
-                      행사 기간 카테고리
+                  <div>
+                    <Label className="text-sm text-gray-700">예산</Label>
+                    <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                      {budget.name} · 잔액 {fmt(budget.currentBalance)}원
                     </div>
-                    {eventCategories.length > 0 ? eventCategories.join(", ") : "설정 없음"}
                   </div>
                 </div>
 
-                {(policy?.eventWindowStart || policy?.eventWindowEnd) && (
-                  <div className="rounded-lg border border-[#E5E7EB] p-4">
-                    <div className="mb-1 text-xs font-medium text-gray-500">
-                      행사 허용 기간
-                    </div>
-                    <div className="text-sm text-gray-700">
-                      {policy?.eventWindowStart
-                        ? fmtDate(policy.eventWindowStart)
-                        : "-"}
-                      {" ~ "}
-                      {policy?.eventWindowEnd ? fmtDate(policy.eventWindowEnd) : "-"}
-                    </div>
+                <div className="mt-4">
+                  <Label className="text-sm text-gray-700">품목 / 메모</Label>
+                  <Textarea
+                    value={exceptionForm.itemDescription}
+                    onChange={(event) =>
+                      setExceptionForm((previous) => ({
+                        ...previous,
+                        itemDescription: event.target.value,
+                      }))
+                    }
+                    placeholder="예: 행사 당일 추가 장비 대여"
+                    className="mt-1 min-h-24"
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <Label className="text-sm text-gray-700">예외 신청 사유</Label>
+                  <Textarea
+                    value={exceptionForm.justification}
+                    onChange={(event) =>
+                      setExceptionForm((previous) => ({
+                        ...previous,
+                        justification: event.target.value,
+                      }))
+                    }
+                    placeholder="왜 정책 밖 결제가 필요한지, 행사나 운영에 어떤 영향이 있는지 적어주세요."
+                    className="mt-1 min-h-28"
+                  />
+                </div>
+
+                {exceptionError && (
+                  <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                    {exceptionError}
                   </div>
                 )}
 
-                <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-                  신규 가맹점은{" "}
-                  <span className="font-semibold text-gray-900">
-                    {policy?.allowNewMerchant ? "허용" : "자동 검토 대상"}
-                  </span>
-                  입니다.
+                {exceptionMessage && (
+                  <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {exceptionMessage}
+                  </div>
+                )}
+
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <div className="text-xs text-gray-500">
+                    제출 즉시 결제가 생성되지는 않습니다. 신청서는 관리자 검토 후 승인 또는
+                    반려됩니다.
+                  </div>
+                  <Button
+                    onClick={handleSubmitExceptionRequest}
+                    disabled={exceptionSubmitting}
+                    className="cursor-pointer bg-[#00857A] text-white hover:bg-[#006B5D]"
+                  >
+                    {exceptionSubmitting ? "제출 중..." : "예외 결제 신청서 제출"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="mt-5 rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
+                운영창이 열리면 이 영역에서 예외 신청서를 작성할 수 있습니다.
+              </div>
+            )}
+
+            <div className="mt-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  최근 예외 결제 신청
+                </h3>
+                <div className="text-xs text-gray-500">
+                  {budget.policyExceptionRequests.length}건
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+
+              {budget.policyExceptionRequests.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
+                  아직 등록된 정책 예외 결제 신청이 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {budget.policyExceptionRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="rounded-xl border border-[#E5E7EB] bg-white p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="mb-1 flex items-center gap-2">
+                            <div className="font-medium text-gray-900">
+                              {request.merchantName}
+                            </div>
+                            <StatusBadge status={request.status} />
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {request.itemDescription}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-gray-900">
+                            {fmt(request.amount)}원
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {fmtDate(request.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span>
+                          카테고리: {getCategoryLabel(request.requestedCategory)}
+                        </span>
+                        <span>
+                          제출창: {request.submissionWindowLabel}{" "}
+                          {String(request.submissionWindowStart).padStart(2, "0")}:00-
+                          {String(request.submissionWindowEnd).padStart(2, "0")}:00
+                        </span>
+                      </div>
+                      <div className="mt-3 rounded-lg bg-[#F8F9FB] px-3 py-2 text-sm text-gray-700">
+                        신청 사유: {request.justification}
+                      </div>
+                      {request.adminComment && (
+                        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                          관리자 의견: {request.adminComment}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
 
         <Tabs defaultValue="transactions" className="w-full">
           <TabsList className="mb-4">
@@ -830,7 +1025,9 @@ export default function BudgetDetailPage({
                         </div>
 
                         <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                          <span>카테고리: {transaction.requestedCategory}</span>
+	                          <span>
+	                            카테고리: {getCategoryLabel(transaction.requestedCategory)}
+	                          </span>
                           <span>재요청 횟수: {transaction.resubmissionCount}회</span>
                           {transaction.lastSubmittedAt && (
                             <span>
@@ -918,11 +1115,11 @@ export default function BudgetDetailPage({
                                   }
                                   className="mt-1 h-11 w-full rounded-xl border border-[#D1D5DB] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#00857A]"
                                 >
-                                  {requestCategories.map((item) => (
-                                    <option key={`${transaction.id}-${item}`} value={item}>
-                                      {item}
-                                    </option>
-                                  ))}
+	                                  {requestCategories.map((item) => (
+	                                    <option key={`${transaction.id}-${item}`} value={item}>
+	                                      {getCategoryLabel(item)}
+	                                    </option>
+	                                  ))}
                                 </select>
                               </div>
                               <div>
@@ -1081,7 +1278,7 @@ export default function BudgetDetailPage({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="rounded-lg bg-gray-50 p-4">
                         <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#006B5D]">
-                          {policy.templateKey || "custom"}
+                          {policy.displayName || "정책"}
                         </div>
                         <div className="text-xs text-gray-500">자동승인 한도</div>
                         <div className="text-lg font-bold text-gray-900">
@@ -1102,6 +1299,21 @@ export default function BudgetDetailPage({
                       </div>
                     </div>
 
+                    <div className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+                      <div className="mb-1 text-xs font-medium text-gray-500">
+                        정책 설명
+                      </div>
+                      <div className="text-sm text-gray-700">
+                        {policy.summary || "등록된 정책 설명이 없습니다."}
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        생성 방식 {policy.policySource || "MANUAL"}
+                        {typeof policy.aiConfidence === "number"
+                          ? ` · AI 신뢰도 ${Math.round(policy.aiConfidence * 100)}%`
+                          : ""}
+                      </div>
+                    </div>
+
                     <div>
                       <h4 className="mb-2 text-sm font-medium text-gray-700">
                         허용 카테고리
@@ -1111,10 +1323,10 @@ export default function BudgetDetailPage({
                           <span
                             key={item}
                             className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700"
-                          >
-                            {item}
-                          </span>
-                        ))}
+	                          >
+	                            {getCategoryLabel(item)}
+	                          </span>
+	                        ))}
                       </div>
                     </div>
 
@@ -1127,10 +1339,10 @@ export default function BudgetDetailPage({
                           <span
                             key={item}
                             className="rounded bg-red-50 px-2 py-1 text-xs text-red-600"
-                          >
-                            {item}
-                          </span>
-                        ))}
+	                          >
+	                            {getCategoryLabel(item)}
+	                          </span>
+	                        ))}
                       </div>
                     </div>
 
@@ -1179,11 +1391,11 @@ export default function BudgetDetailPage({
                           {categoryRuleEntries.map(([ruleCategory, limit]) => (
                             <div
                               key={ruleCategory}
-                              className="rounded-lg bg-[#F8F9FB] px-3 py-2 text-sm text-gray-700"
-                            >
-                              <span className="font-medium text-gray-900">
-                                {ruleCategory}
-                              </span>
+	                            className="rounded-lg bg-[#F8F9FB] px-3 py-2 text-sm text-gray-700"
+	                          >
+	                            <span className="font-medium text-gray-900">
+	                              {getCategoryLabel(ruleCategory)}
+	                            </span>
                               {" · "}
                               {fmt(limit)}원 이하 자동 승인
                             </div>
@@ -1204,12 +1416,10 @@ export default function BudgetDetailPage({
                         </div>
                       </div>
                       <div className="rounded-lg bg-gray-50 p-4">
-                        <div className="text-xs text-gray-500">행사 기간 카테고리</div>
-                        <div className="mt-1 text-sm font-medium text-gray-900">
-                          {eventCategories.length > 0
-                            ? eventCategories.join(", ")
-                            : "설정 없음"}
-                        </div>
+	                        <div className="text-xs text-gray-500">행사 기간 카테고리</div>
+	                        <div className="mt-1 text-sm font-medium text-gray-900">
+	                          {formatCategoryList(eventCategories)}
+	                        </div>
                       </div>
                     </div>
 
