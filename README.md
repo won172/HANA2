@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HANA Budget MVP
 
-## Getting Started
+목적형 예산 토큰 기반의 대학 예산 운영 시뮬레이션 서비스입니다.  
+관리자, 동아리/학생회, 승인자, POS 역할을 기준으로 예산 신청부터 발행, 집행, 정책 검토, 정산, 감사 앵커까지의 흐름을 하나의 서비스 안에서 확인할 수 있습니다.
 
-First, run the development server:
+## 프로젝트 소개
 
+기존의 학생회·동아리 예산 집행은 신청, 승인, 사용, 정산 과정이 분절되어 있어  
+집행 기준이 불명확하거나 사후 검증이 어렵다는 문제가 있습니다.
+
+이 프로젝트는 이러한 문제를 해결하기 위해 다음과 같은 흐름을 MVP 형태로 구현했습니다.
+
+- 예산 신청 및 검토
+- 목적형 예산 발행
+- 정책 기반 거래 승인/보류/거절
+- 원장(Ledger) 기록 관리
+- 예산 정산 및 환수
+- 감사용 앵커 레코드 생성
+
+## 핵심 기능
+
+### 1. 역할 기반 사용자 흐름
+시드 데이터 기준으로 다음 역할을 사용할 수 있습니다.
+
+- 관리자 (ADMIN)
+- 동아리/학생회 사용자 (CLUB_USER)
+- 승인자 (APPROVER)
+- POS 단말기 (POS)
+
+각 역할은 서로 다른 업무 화면과 시나리오를 가집니다.
+
+### 2. 예산 신청 및 발행
+동아리/학생회는 예산 목적, 금액, 사용 기간, 요청 카테고리를 포함한 예산 신청을 등록할 수 있습니다.  
+관리자는 이를 승인/반려하고, 승인된 요청은 실제 예산으로 발행됩니다.
+
+### 3. 정책 기반 집행 통제
+예산별로 허용 카테고리, 금지 카테고리, 금지 키워드, 자동 승인 한도, 수동 검토 한도, 신규 가맹점 허용 여부 등을 정책으로 관리합니다.
+
+예를 들어 다음과 같은 통제가 가능합니다.
+
+- 허용된 업종만 사용 가능
+- `주류`, `담배` 등 금지 키워드 차단
+- 금액 한도에 따른 자동 승인 / 관리자 알림
+- 신규 가맹점 사용 시 검토 요청
+- 행사 기간 / 시간대 조건 반영
+
+### 4. 거래 승인 프로세스
+거래는 정책 조건에 따라 다음 상태로 처리됩니다.
+
+- `APPROVED`
+- `NOTIFIED`
+- `PENDING`
+- `DECLINED`
+
+또한 AI 보조 판단 필드도 함께 저장합니다.
+
+- 추천 카테고리
+- 리스크 점수
+- 리스크 레벨
+- 설명 문구
+
+### 5. 원장(Ledger) 기록
+예산 발행과 집행 내역은 원장 엔트리로 누적 관리됩니다.
+
+- ISSUE
+- SPEND
+- REFUND
+- EXPIRE_RECALL
+
+이를 통해 현재 잔액과 이력 추적이 가능합니다.
+
+### 6. 정산 및 감사 앵커
+예산별 정산 보고와 환수 금액을 관리할 수 있으며,  
+예산 발행 / 정책 스냅샷 / 거래 결정 / 정산 보고에 대해 감사용 앵커 레코드를 생성합니다.
+
+## 기술 스택
+
+### Frontend
+- Next.js 16
+- React 19
+- TypeScript
+- Zustand
+
+### Backend / DB
+- Prisma
+- SQLite
+- better-sqlite3
+
+### UI
+- Tailwind CSS
+- Base UI
+- Lucide React
+- shadcn
+
+### AI / 기타
+- Google GenAI SDK
+- Prisma Seed Script
+
+## 데이터 모델
+
+주요 엔티티는 다음과 같습니다.
+
+- `User`
+- `Organization`
+- `BudgetRequest`
+- `Budget`
+- `Policy`
+- `Transaction`
+- `LedgerEntry`
+- `BudgetSettlement`
+- `PolicyExceptionRequest`
+- `AnchorRecord`
+- `Merchant`
+
+즉, 단순 가계부 앱이 아니라  
+“예산 신청 → 예산 발행 → 정책 집행 → 거래 기록 → 정산 → 감사 추적”의 전체 흐름을 담은 구조입니다.
+
+## 실행 방법
+
+### 1. 패키지 설치
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+npm install
